@@ -263,6 +263,8 @@ def main(args):
     if all_args.share_policy:
         if all_args.env_name == "GraphMPE":
             from onpolicy.runner.shared.graph_mpe_runner import GMPERunner as Runner
+        elif all_args.env_name == "GSMPE":
+            from onpolicy.runner.shared.graph_lagr_mpe_runner import GSMPERunner as Runner
         else:
             from onpolicy.runner.shared.mpe_runner import MPERunner as Runner
     else:
