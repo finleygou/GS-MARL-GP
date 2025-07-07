@@ -22,7 +22,7 @@ class GSMPERunner(Runner):
     dt = 0.1
 
     def __init__(self, config):
-        super(GMPERunner, self).__init__(config)
+        super(GSMPERunner, self).__init__(config)
         self.save_data = self.all_args.save_data
         self.use_train_render = self.all_args.use_train_render
         self.no_imageshow = self.all_args.no_imageshow
@@ -57,19 +57,18 @@ class GSMPERunner(Runner):
             for step in range(self.episode_length):
                 # print("step:", step)
                 # Sample actions
-                (
-                    values,
+                (   values,
                     actions,
                     action_log_probs,
                     rnn_states,
                     rnn_states_critic,
                     actions_env,
+                    cost_preds,
+                    rnn_states_cost,
                 ) = self.collect(step)
 
                 # Obs reward and next obs
-                obs, agent_id, node_obs, adj, rewards, dones, infos = self.envs.step(
-                    actions_env
-                )
+                obs, agent_id, node_obs, adj, rewards, costs, dones, infos = self.envs.step(actions_env)
 
                 data = (
                     obs,
@@ -78,6 +77,7 @@ class GSMPERunner(Runner):
                     adj,
                     agent_id,
                     rewards,
+                    costs,
                     dones,
                     infos,
                     values,
@@ -85,6 +85,8 @@ class GSMPERunner(Runner):
                     action_log_probs,
                     rnn_states,
                     rnn_states_critic,
+                    cost_preds,
+                    rnn_states_cost
                 )
 
                 # insert data into buffer
@@ -175,7 +177,7 @@ class GSMPERunner(Runner):
         self.buffer.share_agent_id[0] = share_agent_id.copy()
 
     @torch.no_grad()
-    def collect(self, step: int) -> Tuple[arr, arr, arr, arr, arr, arr]:
+    def collect(self, step: int) -> Tuple[arr, arr, arr, arr, arr, arr, arr, arr]:
         self.trainer.prep_rollout()
         (
             value,
@@ -183,6 +185,8 @@ class GSMPERunner(Runner):
             action_log_prob,
             rnn_states,
             rnn_states_critic,
+            cost_preds,
+            rnn_states_cost,
         ) = self.trainer.policy.get_actions(
             np.concatenate(self.buffer.share_obs[step]),
             np.concatenate(self.buffer.obs[step]),
@@ -193,6 +197,7 @@ class GSMPERunner(Runner):
             np.concatenate(self.buffer.rnn_states[step]),
             np.concatenate(self.buffer.rnn_states_critic[step]),
             np.concatenate(self.buffer.masks[step]),
+            np.concatenate(self.buffer.rnn_states_cost[step]),
         )
         # [self.envs, agents, dim]
         values = np.array(np.split(_t2n(value), self.n_rollout_threads))
@@ -201,9 +206,10 @@ class GSMPERunner(Runner):
             np.split(_t2n(action_log_prob), self.n_rollout_threads)
         )
         rnn_states = np.array(np.split(_t2n(rnn_states), self.n_rollout_threads))
-        rnn_states_critic = np.array(
-            np.split(_t2n(rnn_states_critic), self.n_rollout_threads)
-        )
+        rnn_states_critic = np.array(np.split(_t2n(rnn_states_critic), self.n_rollout_threads))
+        cost_preds = np.array(np.split(_t2n(cost_preds), self.n_rollout_threads))
+        rnn_states_cost = np.array(np.split(_t2n(rnn_states_cost), self.n_rollout_threads))
+        
         # rearrange action
         if self.envs.action_space[0].__class__.__name__ == "MultiDiscrete":
             for i in range(self.envs.action_space[0].shape):
@@ -226,6 +232,8 @@ class GSMPERunner(Runner):
             rnn_states,
             rnn_states_critic,
             actions_env,
+            cost_preds,
+            rnn_states_cost,
         )
 
     def insert(self, data):
@@ -236,6 +244,7 @@ class GSMPERunner(Runner):
             adj,
             agent_id,
             rewards,
+            costs,
             dones,
             infos,
             values,
@@ -243,6 +252,8 @@ class GSMPERunner(Runner):
             action_log_probs,
             rnn_states,
             rnn_states_critic,
+            cost_preds,
+            rnn_states_cost,
         ) = data
 
         rnn_states[dones == True] = np.zeros(
@@ -251,6 +262,10 @@ class GSMPERunner(Runner):
         )
         rnn_states_critic[dones == True] = np.zeros(
             ((dones == True).sum(), *self.buffer.rnn_states_critic.shape[3:]),
+            dtype=np.float32,
+        )
+        rnn_states_cost[dones == True] = np.zeros(
+            ((dones == True).sum(), *self.buffer.rnn_states_cost.shape[3:]),
             dtype=np.float32,
         )
         masks = np.ones((self.n_rollout_threads, self.num_agents, 1), dtype=np.float32)
@@ -287,11 +302,14 @@ class GSMPERunner(Runner):
             values,
             rewards,
             masks,
+            costs=costs,
+            cost_preds=cost_preds,
+            rnn_states_cost=rnn_states_cost,
         )
 
     @torch.no_grad()
     def compute(self):
-        """Calculate returns for the collected data."""
+        """Calculate returns for the collected data. added cost returns"""
         self.trainer.prep_rollout()
         next_values = self.trainer.policy.get_values(
             np.concatenate(self.buffer.share_obs[-1]),
@@ -314,11 +332,23 @@ class GSMPERunner(Runner):
         next_costs = np.array(np.split(_t2n(next_costs), self.n_rollout_threads))
 
         self.buffer.compute_returns(next_values, self.trainer.value_normalizer)
-        self.buffer.compute_costreturns(next_costs, self.trainer.value_normalizer)
+        self.buffer.compute_cost_returns(next_costs, self.trainer.value_normalizer)
 
     @torch.no_grad()
     def eval(self, total_num_steps: int):
+        """Evaluate policies with data from eval environments, including costs."""
+        eval_episode = 0
         eval_episode_rewards = []
+        eval_episode_costs = []
+        one_episode_rewards = []
+        one_episode_costs = []
+
+        for eval_i in range(self.n_eval_rollout_threads):
+            one_episode_rewards.append([])
+            eval_episode_rewards.append([])
+            one_episode_costs.append([])
+            eval_episode_costs.append([])
+
         eval_obs, eval_agent_id, eval_node_obs, eval_adj = self.eval_envs.reset()
 
         eval_rnn_states = np.zeros(
@@ -329,7 +359,7 @@ class GSMPERunner(Runner):
             (self.n_eval_rollout_threads, self.num_agents, 1), dtype=np.float32
         )
 
-        for eval_step in range(self.episode_length):
+        while True:
             self.trainer.prep_rollout()
             eval_action, eval_rnn_states = self.trainer.policy.act(
                 np.concatenate(eval_obs),
@@ -365,42 +395,57 @@ class GSMPERunner(Runner):
             else:
                 raise NotImplementedError
 
-            # Obser reward and next obs
+
+            # Observe reward, cost, and next obs
             (
                 eval_obs,
                 eval_agent_id,
                 eval_node_obs,
                 eval_adj,
                 eval_rewards,
+                eval_costs,
                 eval_dones,
                 eval_infos,
             ) = self.eval_envs.step(eval_actions_env)
-            eval_episode_rewards.append(eval_rewards)
 
-            eval_rnn_states[eval_dones == True] = np.zeros(
-                ((eval_dones == True).sum(), self.recurrent_N, self.hidden_size),
+            for eval_i in range(self.n_eval_rollout_threads):
+                one_episode_rewards[eval_i].append(eval_rewards[eval_i])
+                one_episode_costs[eval_i].append(eval_costs[eval_i])
+
+            eval_dones_env = np.all(eval_dones, axis=1)
+
+            eval_rnn_states[eval_dones_env == True] = np.zeros(
+                ((eval_dones_env == True).sum(), self.recurrent_N, self.hidden_size),
                 dtype=np.float32,
             )
             eval_masks = np.ones(
                 (self.n_eval_rollout_threads, self.num_agents, 1), dtype=np.float32
             )
-            eval_masks[eval_dones == True] = np.zeros(
-                ((eval_dones == True).sum(), 1), dtype=np.float32
+            eval_masks[eval_dones_env == True] = np.zeros(
+                ((eval_dones_env == True).sum(), 1), dtype=np.float32
             )
 
-        eval_episode_rewards = np.array(eval_episode_rewards)
-        eval_env_infos = {}
-        eval_env_infos["eval_average_episode_rewards"] = np.sum(
-            np.array(eval_episode_rewards), axis=0
-        )
-        eval_average_episode_rewards = np.mean(
-            eval_env_infos["eval_average_episode_rewards"]
-        )
-        print(
-            "eval average episode rewards of agent: "
-            + str(eval_average_episode_rewards)
-        )
-        self.log_env(eval_env_infos, total_num_steps)
+            for eval_i in range(self.n_eval_rollout_threads):
+                if eval_dones_env[eval_i]:
+                    eval_episode += 1
+                    eval_episode_rewards[eval_i].append(np.sum(one_episode_rewards[eval_i], axis=0))
+                    eval_episode_costs[eval_i].append(np.sum(one_episode_costs[eval_i], axis=0))
+                    one_episode_rewards[eval_i] = []
+                    one_episode_costs[eval_i] = []
+
+            if eval_episode >= self.all_args.eval_episodes:
+                eval_episode_rewards = np.concatenate(eval_episode_rewards)
+                eval_episode_costs = np.concatenate(eval_episode_costs)
+                eval_env_infos = {
+                    'eval_average_episode_rewards': eval_episode_rewards,
+                    'eval_max_episode_rewards': [np.max(eval_episode_rewards)],
+                    'eval_average_episode_costs': eval_episode_costs,
+                    'eval_max_episode_costs': [np.max(eval_episode_costs)]
+                }
+                self.log_env(eval_env_infos, total_num_steps)
+                print("eval average episode rewards of agent: " + str(np.mean(eval_episode_rewards)))
+                print("eval average episode costs of agent: " + str(np.mean(eval_episode_costs)))
+                break
 
     @torch.no_grad()
     def render(self, get_metrics: bool = False):
@@ -412,7 +457,8 @@ class GSMPERunner(Runner):
         envs = self.envs
 
         all_frames = []
-        rewards_arr, success_rates_arr, num_collisions_arr, frac_episode_arr = (
+        rewards_arr, costs_arr, success_rates_arr, num_collisions_arr, frac_episode_arr = (
+            [],
             [],
             [],
             [],
@@ -442,6 +488,7 @@ class GSMPERunner(Runner):
             )
 
             episode_rewards = []
+            episode_costs = []
 
             for step in range(self.episode_length):
                 calc_start = time.time()
@@ -478,10 +525,11 @@ class GSMPERunner(Runner):
                     raise NotImplementedError
 
                 # Obser reward and next obs
-                obs, agent_id, node_obs, adj, rewards, dones, infos = envs.step(
+                obs, agent_id, node_obs, adj, rewards, costs, dones, infos = envs.step(
                     actions_env
                 )
                 episode_rewards.append(rewards)
+                episode_costs.append(costs)
 
                 rnn_states[dones == True] = np.zeros(
                     ((dones == True).sum(), self.recurrent_N, self.hidden_size),
@@ -513,6 +561,7 @@ class GSMPERunner(Runner):
             frac_episode_arr.append(np.mean(frac))
             success_rates_arr.append(success)
             num_collisions_arr.append(num_collisions)
+            costs_arr.append(np.mean(np.sum(np.array(episode_costs), axis=0)))
 
             # print(np.mean(frac), success)
             # print("Average episode rewards is: " +

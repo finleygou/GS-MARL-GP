@@ -182,9 +182,6 @@ class Scenario(BaseScenario):
 
     def info_callback(self, agent: Agent, world: World) -> Tuple:
         # # TODO modify this
-        rew = 0
-        collisions = 0
-        occupied_landmarks = 0
         goal = agent.goal
         dist = np.sqrt(np.sum(np.square(agent.state.p_pos - goal)))
         world.dist_left_to_goal[agent.id] = dist
@@ -192,24 +189,14 @@ class Scenario(BaseScenario):
         if dist < 0.1 and (world.times_required[agent.id] == -1):
             world.times_required[agent.id] = world.current_time_step * world.dt
 
-        if agent.collide:
-            if self.is_obstacle_collision(agent.state.p_pos, agent.R, world):
-                world.num_obstacle_collisions[agent.id] += 1
-            for a in world.agents:
-                if a is agent:
-                    continue
-                if self.is_collision(agent, a):
-                    world.num_agent_collisions[agent.id] += 1
-
         agent_info = {
             "Dist_to_goal": world.dist_left_to_goal[agent.id],
             "Time_req_to_goal": world.times_required[agent.id],
-            "Num_agent_collisions": world.num_agent_collisions[agent.id],
-            "Num_obst_collisions": world.num_obstacle_collisions[agent.id],
+            "Num_agent_collisions": 0,
+            "Num_obst_collisions": 0,
         }
 
         return agent_info
-
 
     # check collision of entity with obstacles
     def is_obstacle_collision(self, pos, entity_size: float, world: World) -> bool:
@@ -326,6 +313,36 @@ class Scenario(BaseScenario):
         # print(f"id:{ego.id} e_f_value: {e_f_value}  r_f_value: {r_fom}  r_ca: {r_ca}")
 
         return rew
+
+    def cost(self, agent: Agent, world: World) -> float:
+        # the cost is the number of collisions with obstacles and other agents
+        # similar to Num_agent_collisions in info_callback
+        if self.use_CL:
+            self.set_CL(glv.get_value('CL_ratio'), world)
+        cost = 0.0
+        if agent.collide:
+            # cost for colliding with obstacles
+            for obstacle in world.obstacles:
+                delta_pos = obstacle.state.p_pos - agent.state.p_pos
+                dist = np.linalg.norm(delta_pos)
+                dist_min = obstacle.R + agent.R
+                if dist < dist_min:
+                    cost += 1.0
+            # cost for colliding with dynamic obstacles
+            for d_obs in world.dynamic_obstacles:
+                delta_pos = d_obs.state.p_pos - agent.state.p_pos
+                dist = np.linalg.norm(delta_pos)
+                dist_min = d_obs.R + agent.R
+                if dist < dist_min:
+                    cost += 1.0
+            # cost for colliding with other agents
+            for a in world.agents:
+                if a is agent:
+                    continue
+                if self.is_collision(agent, a):
+                    cost += 1.0
+        
+        return cost
 
     def observation(self, agent: Agent, world: World) -> arr:
         """

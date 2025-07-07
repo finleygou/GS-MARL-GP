@@ -32,7 +32,7 @@ def make_train_env(all_args: argparse.Namespace):
         def init_env():
             if all_args.env_name == "MPE":
                 env = MPEEnv(all_args)
-            elif all_args.env_name == "GraphMPE":
+            elif all_args.env_name == "GraphMPE" or all_args.env_name == "GSMPE":
                 env = GraphMPEEnv(all_args)
             else:
                 print(f"Can not support the {all_args.env_name} environment")
@@ -43,11 +43,11 @@ def make_train_env(all_args: argparse.Namespace):
         return init_env
 
     if all_args.n_rollout_threads == 1:
-        if all_args.env_name == "GraphMPE":
+        if all_args.env_name == "GraphMPE" or all_args.env_name == "GSMPE":
             return GraphDummyVecEnv([get_env_fn(0)])
         return DummyVecEnv([get_env_fn(0)])
     else:
-        if all_args.env_name == "GraphMPE":
+        if all_args.env_name == "GraphMPE" or all_args.env_name == "GSMPE":
             return GraphSubprocVecEnv(
                 [get_env_fn(i) for i in range(all_args.n_rollout_threads)]
             )
@@ -59,7 +59,7 @@ def make_eval_env(all_args: argparse.Namespace):
         def init_env():
             if all_args.env_name == "MPE":
                 env = MPEEnv(all_args)
-            elif all_args.env_name == "GraphMPE":
+            elif all_args.env_name == "GraphMPE" or all_args.env_name == "GSMPE":
                 env = GraphMPEEnv(all_args)
             else:
                 print(f"Can not support the {all_args.env_name} environment")
@@ -70,11 +70,11 @@ def make_eval_env(all_args: argparse.Namespace):
         return init_env
 
     if all_args.n_eval_rollout_threads == 1:
-        if all_args.env_name == "GraphMPE":
+        if all_args.env_name == "GraphMPE" or all_args.env_name == "GSMPE":
             return GraphDummyVecEnv([get_env_fn(0)])
         return DummyVecEnv([get_env_fn(0)])
     else:
-        if all_args.env_name == "GraphMPE":
+        if all_args.env_name == "GraphMPE" or all_args.env_name == "GSMPE":
             return GraphSubprocVecEnv(
                 [get_env_fn(i) for i in range(all_args.n_rollout_threads)]
             )
@@ -135,7 +135,7 @@ def parse_args(args, parser):
 def main(args):
     parser = get_config()
     all_args, parser = parse_args(args, parser)
-    if all_args.env_name == "GraphMPE":
+    if all_args.env_name == "GraphMPE" or all_args.env_name == "GSMPE":
         from onpolicy.config import graph_config
 
         all_args, parser = graph_config(args, parser)

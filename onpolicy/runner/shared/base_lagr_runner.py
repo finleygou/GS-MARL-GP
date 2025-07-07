@@ -7,8 +7,8 @@ import copy
 
 # from torch.utils.tensorboard import SummaryWriter
 from tensorboardX import SummaryWriter  # tensorboardX to work with macos
-from onpolicy.utils.shared_buffer import SharedReplayBuffer
-from onpolicy.utils.graph_buffer import GraphReplayBuffer
+# from onpolicy.utils.shared_buffer import SharedReplayBuffer
+# from onpolicy.utils.graph_buffer import GraphReplayBuffer
 from onpolicy.utils.gs_buffer import GSReplayBuffer
 
 
@@ -80,15 +80,10 @@ class Runner(object):
                 if not os.path.exists(self.save_dir):
                     os.makedirs(self.save_dir)
 
-        if self.all_args.env_name == "GraphMPE":
-            from onpolicy.algorithms.graph_mappo import GR_MAPPO as TrainAlgo
-            from onpolicy.algorithms.graph_MAPPOPolicy import GR_MAPPOPolicy as Policy
-        elif self.all_args.env_name == "GSMPE":
-            from onpolicy.algorithms.graph_lagr_mappo import GS_MAPPO as TrainAlgo
-            from onpolicy.algorithms.graph_lagr_MAPPOPolicy import GS_MAPPOPolicy as Policy
-        else:
-            from onpolicy.algorithms.mappo import R_MAPPO as TrainAlgo
-            from onpolicy.algorithms.MAPPOPolicy import R_MAPPOPolicy as Policy
+
+        from onpolicy.algorithms.graph_lagr_mappo import GS_MAPPO as TrainAlgo
+        from onpolicy.algorithms.graph_lagr_MAPPOPolicy import GS_MAPPOPolicy as Policy
+
 
         # NOTE change variable input here
         if self.use_centralized_V:
@@ -97,24 +92,16 @@ class Runner(object):
             share_observation_space = self.envs.observation_space[0]
 
         # policy network
-        if self.all_args.env_name == "GSMPE":
-            self.policy = Policy(
-                self.all_args,
-                self.envs.observation_space[0],
-                share_observation_space,
-                self.envs.node_observation_space[0],
-                self.envs.edge_observation_space[0],
-                self.envs.action_space[0],
-                device=self.device,
-            )
-        else:
-            self.policy = Policy(
-                self.all_args,
-                self.envs.observation_space[0],
-                share_observation_space,
-                self.envs.action_space[0],
-                device=self.device,
-            )
+        self.policy = Policy(
+            self.all_args,
+            self.envs.observation_space[0],
+            share_observation_space,
+            self.envs.node_observation_space[0],
+            self.envs.edge_observation_space[0],
+            self.envs.action_space[0],
+            device=self.device,
+        )
+
 
         if self.model_dir is not None:
             print(f"Restoring from checkpoint stored in {self.model_dir}")
@@ -125,26 +112,17 @@ class Runner(object):
         self.trainer = TrainAlgo(self.all_args, self.policy, device=self.device)
 
         # buffer
-        if self.all_args.env_name == "GSMPE":
-            self.buffer = GSReplayBuffer(
-                self.all_args,
-                self.num_agents,
-                self.envs.observation_space[0],
-                share_observation_space,
-                self.envs.node_observation_space[0],
-                self.envs.agent_id_observation_space[0],
-                self.envs.share_agent_id_observation_space[0],
-                self.envs.adj_observation_space[0],
-                self.envs.action_space[0],
-            )
-        else:
-            self.buffer = SharedReplayBuffer(
-                self.all_args,
-                self.num_agents,
-                self.envs.observation_space[0],
-                share_observation_space,
-                self.envs.action_space[0],
-            )
+        self.buffer = GSReplayBuffer(
+            self.all_args,
+            self.num_agents,
+            self.envs.observation_space[0],
+            share_observation_space,
+            self.envs.node_observation_space[0],
+            self.envs.agent_id_observation_space[0],
+            self.envs.share_agent_id_observation_space[0],
+            self.envs.adj_observation_space[0],
+            self.envs.action_space[0],
+        )
 
     def run(self):
         """Collect training data, perform training updates, and evaluate policy."""
@@ -171,11 +149,55 @@ class Runner(object):
         raise NotImplementedError
 
     def train(self):
-        """Train policies with data in buffer."""
+        """Train policies with data in buffer, including safety-related data."""
         self.trainer.prep_training()
-        train_infos = self.trainer.train(self.buffer)
+        
+        # Initialize factor for Lagrangian method
+        action_dim = self.buffer.actions.shape[-1]
+        factor = np.ones((self.episode_length, self.n_rollout_threads, self.num_agents, action_dim), dtype=np.float32)
+        self.buffer.update_factor(factor)
+
+        # Prepare available actions
+        available_actions = None if self.buffer.available_actions is None \
+            else self.buffer.available_actions[:-1].reshape(-1, *self.buffer.available_actions.shape[3:])
+
+        # Compute old action log probabilities
+        old_actions_logprob, _ = self.trainer.policy.actor.evaluate_actions(
+            self.buffer.obs[:-1].reshape(-1, *self.buffer.obs.shape[3:]),
+            self.buffer.rnn_states[0:1].reshape(-1, *self.buffer.rnn_states.shape[3:]),
+            self.buffer.actions.reshape(-1, *self.buffer.actions.shape[3:]),
+            self.buffer.masks[:-1].reshape(-1, *self.buffer.masks.shape[3:]),
+            available_actions,
+            self.buffer.active_masks[:-1].reshape(-1, *self.buffer.active_masks.shape[3:]),
+            self.buffer.node_obs[:-1].reshape(-1, *self.buffer.node_obs.shape[3:]),
+            self.buffer.adj[:-1].reshape(-1, *self.buffer.adj.shape[3:]),
+            self.buffer.agent_id[:-1].reshape(-1, *self.buffer.agent_id.shape[3:])
+        )
+
+        # Train with buffer data and cost advantage
+        train_info = self.trainer.train(self.buffer)
+
+        # Compute new action log probabilities and update factor
+        new_actions_logprob, _ = self.trainer.policy.actor.evaluate_actions(
+            self.buffer.obs[:-1].reshape(-1, *self.buffer.obs.shape[3:]),
+            self.buffer.rnn_states[0:1].reshape(-1, *self.buffer.rnn_states.shape[3:]),
+            self.buffer.actions.reshape(-1, *self.buffer.actions.shape[3:]),
+            self.buffer.masks[:-1].reshape(-1, *self.buffer.masks.shape[3:]),
+            available_actions,
+            self.buffer.active_masks[:-1].reshape(-1, *self.buffer.active_masks.shape[3:]),
+            self.buffer.node_obs[:-1].reshape(-1, *self.buffer.node_obs.shape[3:]),
+            self.buffer.adj[:-1].reshape(-1, *self.buffer.adj.shape[3:]),
+            self.buffer.agent_id[:-1].reshape(-1, *self.buffer.agent_id.shape[3:])
+        )
+
+        # ***************************************************** factor的结构？还要修改。不知道是否有num-agents
+        factor = factor * _t2n(torch.exp(new_actions_logprob - old_actions_logprob).reshape(
+            self.episode_length, self.n_rollout_threads, self.num_agents, action_dim))
+        
+        self.buffer.update_factor(factor)
         self.buffer.after_update()
-        return train_infos
+
+        return train_info
 
     def save(self):
         """Save policy's actor and critic networks."""

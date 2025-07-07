@@ -10,7 +10,7 @@ from onpolicy.utils.util import update_linear_schedule
 
 class GS_MAPPOPolicy:
     """
-    MAPPO Policy  class. Wraps actor and critic networks
+    MAPPO Policy class altered for Graph Safe task. Wraps actor and critic networks
     to compute actions and value function predictions.
 
     args: (argparse.Namespace)
@@ -73,6 +73,15 @@ class GS_MAPPOPolicy:
             self.split_batch,
             self.max_batch_size,
         )
+        self.cost_critic = GR_Critic(
+            args,
+            self.share_obs_space,
+            self.node_obs_space,
+            self.edge_obs_space,
+            self.device,
+            self.split_batch,
+            self.max_batch_size,
+        )
 
         self.actor_optimizer = torch.optim.Adam(
             self.actor.parameters(),
@@ -82,6 +91,12 @@ class GS_MAPPOPolicy:
         )
         self.critic_optimizer = torch.optim.Adam(
             self.critic.parameters(),
+            lr=self.critic_lr,
+            eps=self.opti_eps,
+            weight_decay=self.weight_decay,
+        )
+        self.cost_optimizer = torch.optim.Adam(
+            self.cost_critic.parameters(),
             lr=self.critic_lr,
             eps=self.opti_eps,
             weight_decay=self.weight_decay,
@@ -107,6 +122,12 @@ class GS_MAPPOPolicy:
             total_num_epochs=episodes,
             initial_lr=self.critic_lr,
         )
+        update_linear_schedule(
+            optimizer=self.cost_optimizer,
+            epoch=episode,
+            total_num_epochs=episodes,
+            initial_lr=self.critic_lr,
+        )   
 
     def get_actions(
         self,
@@ -119,9 +140,10 @@ class GS_MAPPOPolicy:
         rnn_states_actor,
         rnn_states_critic,
         masks,
+        rnn_states_cost,
         available_actions=None,
         deterministic=False,
-    ) -> Tuple[Tensor, Tensor, Tensor, Tensor, Tensor]:
+    ) -> Tuple[Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor]:
         """
         Compute actions and value function predictions for the given inputs.
         cent_obs (np.ndarray):
@@ -159,6 +181,10 @@ class GS_MAPPOPolicy:
             updated actor network RNN states.
         :return rnn_states_critic: (torch.Tensor)
             updated critic network RNN states.
+        :return cost_preds: (torch.Tensor)
+            cost function predictions.
+        :return rnn_states_cost: (torch.Tensor)
+            updated cost critic network RNN states.
         """
         actions, action_log_probs, rnn_states_actor = self.actor.forward(
             obs,
@@ -174,7 +200,12 @@ class GS_MAPPOPolicy:
         values, rnn_states_critic = self.critic.forward(
             cent_obs, node_obs, adj, share_agent_id, rnn_states_critic, masks
         )
-        return (values, actions, action_log_probs, rnn_states_actor, rnn_states_critic)
+
+        cost_preds, rnn_states_cost = self.cost_critic.forward(
+            cent_obs, node_obs, adj, share_agent_id, rnn_states_cost, masks
+        )
+
+        return (values, actions, action_log_probs, rnn_states_actor, rnn_states_critic, cost_preds, rnn_states_cost)
 
     def get_values(
         self, cent_obs, node_obs, adj, share_agent_id, rnn_states_critic, masks
@@ -201,6 +232,31 @@ class GS_MAPPOPolicy:
         )
         return values
 
+    def get_cost_values(
+        self, cent_obs, node_obs, adj, share_agent_id, rnn_states_cost, masks
+    ) -> Tensor:
+        """
+        Get cost function predictions.
+        cent_obs (np.ndarray):
+            centralized input to the critic.
+        node_obs (np.ndarray):
+            Local agent graph node features to the actor.
+        adj (np.ndarray):
+            Adjacency matrix for the graph.
+        share_agent_id (np.ndarray):
+            Agent id to which cent_observations belong to.
+        rnn_states_critic: (np.ndarray)
+            if critic is RNN, RNN states for critic.
+        masks: (np.ndarray)
+            denotes points at which RNN states should be reset.
+
+        :return costs: (torch.Tensor) cost function predictions.
+        """
+        cost_preds, _ = self.cost_critic.forward(
+            cent_obs, node_obs, adj, share_agent_id, rnn_states_cost, masks
+        )
+        return cost_preds
+
     def evaluate_actions(
         self,
         cent_obs,
@@ -215,7 +271,8 @@ class GS_MAPPOPolicy:
         masks,
         available_actions=None,
         active_masks=None,
-    ) -> Tuple[Tensor, Tensor, Tensor]:
+        rnn_states_cost=None,
+    ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
         """
         Get action logprobs / entropy and
         value function predictions for actor update.
@@ -267,7 +324,11 @@ class GS_MAPPOPolicy:
         values, _ = self.critic.forward(
             cent_obs, node_obs, adj, share_agent_id, rnn_states_critic, masks
         )
-        return values, action_log_probs, dist_entropy
+
+        cost_values, _ = self.cost_critic.forward(
+            cent_obs, node_obs, adj, share_agent_id, rnn_states_cost, masks
+        )
+        return values, action_log_probs, dist_entropy, cost_values
 
     def act(
         self,

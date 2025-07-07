@@ -1,185 +1,208 @@
+from math import ceil, floor, sqrt
+import copy
+import numpy
+
+from math import cos, sin, tan, atan2, asin
+
+from math import pi as PI
 import numpy as np
-import rvo2
-
-import matplotlib.pyplot as plt
 
 
-# keep angle between [-pi, pi]
-def wrap(angle):
-    while angle >= np.pi:
-        angle -= 2 * np.pi
-    while angle < -np.pi:
-        angle += 2 * np.pi
-    return angle
+def distance(pose1, pose2):
+    """ compute Euclidean distance for 2D """
+    return sqrt((pose1[0]-pose2[0])**2+(pose1[1]-pose2[1])**2)+0.00001
 
+def RVO(ego,neighbors_ego,neighbors_dobs,neighbors_obs,V_des):
+    vA = list(ego.state.p_vel)
+    pA = list(ego.state.p_pos)
+    ROB_RAD = ego.R*2
+    RVO_BA_all = []
+    for nb_ego in neighbors_ego:
+        vB = list(nb_ego.state.p_vel)
+        pB = list(nb_ego.state.p_pos)
+        # use RVO
+        transl_vB_vA = [pA[0]+0.5*(vB[0]+vA[0]), pA[1]+0.5*(vB[1]+vA[1])]
+        # transl_vB_vA = [pA[0]+vB[0], pA[1]+vB[1]]
 
-class RVOPolicy:
-    def __init__(self):
-        sensing_horizon = np.inf
-        max_num_agents_in_env = 19
-        rvo_time_horizon = 2.5  # NOTE: bjorn used 1.0 in training for corl19
-        self.rvo_collab_coeff = 0.5
-        self.rvo_anti_collab_t = 1.0
-        self.dt = 0.1
-        ########################################################################
-        neighbor_dist = sensing_horizon
-        max_neighbors = max_num_agents_in_env
+        # use VO
+        #transl_vB_vA = [pA[0]+vB[0], pA[1]+vB[1]]
+        dist_BA = distance(pA, pB)
+        theta_BA = atan2(pB[1]-pA[1], pB[0]-pA[0])
+        if 2*ROB_RAD > dist_BA:
+            dist_BA = 2*ROB_RAD
+        theta_BAort = asin(2*ROB_RAD/dist_BA)
+        theta_ort_left = theta_BA+theta_BAort
+        bound_left = [cos(theta_ort_left), sin(theta_ort_left)]
+        theta_ort_right = theta_BA-theta_BAort
+        bound_right = [cos(theta_ort_right), sin(theta_ort_right)]
+        # use HRVO
+        # dist_dif = distance([0.5*(vB[0]-vA[0]),0.5*(vB[1]-vA[1])],[0,0])
+        # transl_vB_vA = [pA[0]+vB[0]+cos(theta_ort_left)*dist_dif, pA[1]+vB[1]+sin(theta_ort_left)*dist_dif]
+        RVO_BA = [transl_vB_vA, bound_left, bound_right, dist_BA, 2*ROB_RAD]
+        RVO_BA_all.append(RVO_BA)
+    for nb_obs in neighbors_obs:
+        vB = [0, 0]
+        pB = list(nb_obs.state.p_pos)
+        transl_vB_vA = [pA[0]+vB[0], pA[1]+vB[1]]
+        dist_BA = distance(pA, pB)
+        theta_BA = atan2(pB[1]-pA[1], pB[0]-pA[0])
+        # over-approximation of square to circular
+        rad = nb_obs.R
+        if (rad+ROB_RAD) > dist_BA:
+            dist_BA = rad+ROB_RAD
+        theta_BAort = asin((rad+ROB_RAD)/dist_BA)
+        theta_ort_left = theta_BA+theta_BAort
+        bound_left = [cos(theta_ort_left), sin(theta_ort_left)]
+        theta_ort_right = theta_BA-theta_BAort
+        bound_right = [cos(theta_ort_right), sin(theta_ort_right)]
+        RVO_BA = [transl_vB_vA, bound_left, bound_right, dist_BA, rad+ROB_RAD]
+        RVO_BA_all.append(RVO_BA) 
+    for nb_dobs in neighbors_dobs:
+        vB = list(nb_dobs.state.p_vel)
+        pB = list(nb_dobs.state.p_pos)
+        transl_vB_vA = [pA[0]+vB[0], pA[1]+vB[1]]
+        dist_BA = distance(pA, pB)
+        theta_BA = atan2(pB[1]-pA[1], pB[0]-pA[0])
+        # over-approximation of square to circular
+        rad = nb_dobs.R
+        if (rad+ROB_RAD) > dist_BA:
+            dist_BA = rad+ROB_RAD
+        theta_BAort = asin((rad+ROB_RAD)/dist_BA)
+        theta_ort_left = theta_BA+theta_BAort
+        bound_left = [cos(theta_ort_left), sin(theta_ort_left)]
+        theta_ort_right = theta_BA-theta_BAort
+        bound_right = [cos(theta_ort_right), sin(theta_ort_right)]
+        RVO_BA = [transl_vB_vA, bound_left, bound_right, dist_BA, rad+ROB_RAD]
+        RVO_BA_all.append(RVO_BA)
+    vA_post = intersect(pA, V_des, RVO_BA_all) 
+    return vA_post
 
-        self.has_fixed_speed = False
-        self.heading_noise = False
-
-        self.max_delta_heading = np.pi / 6
-
-        # TODO share this parameter with environment
-        # Initialize RVO simulator
-        self.sim = rvo2.PyRVOSimulator(
-            timeStep=self.dt,
-            neighborDist=neighbor_dist,
-            maxNeighbors=max_neighbors,
-            timeHorizon=rvo_time_horizon,
-            timeHorizonObst=rvo_time_horizon,
-            radius=0.0,
-            maxSpeed=0.0,
-        )
-
-        self.is_init = False
-
-        self.use_non_coop_policy = True
-
-    def init(self):
-        state_dim = 2
-        self.pos_agents = np.empty((self.n_agents, state_dim))
-        self.vel_agents = np.empty((self.n_agents, state_dim))
-        self.goal_agents = np.empty((self.n_agents, state_dim))
-        self.pref_vel_agents = np.empty((self.n_agents, state_dim))
-        self.pref_speed_agents = np.empty((self.n_agents))
-
-        self.rvo_agents = [None] * self.n_agents
-
-        # Init simulation
-        for a in range(self.n_agents):
-            self.rvo_agents[a] = self.sim.addAgent((0, 0))
-
-        self.is_init = True
-
-    # NOTE: Right now just supports multi-discrete actions
-    # actions: [None, ←, →, ↓, ↑, comm1, comm2]
-    def convert_to_action(self, delta_pos):
-        action = np.zeros(7)
-        # if the required movement is not much, then `no_action`
-        if np.linalg.norm(delta_pos) <= self.goal_threshold:
-            action[0] = 1
-        else:
-            angle = np.deg2rad(np.arctan2(delta_pos[1], delta_pos[0]))
-            # activate right action
-            if angle < 67.5 and angle >= -67.5:
-                action[2] = 1
-            # activate up action
-            if angle < 157.5 and angle >= 22.5:
-                action[4] = 1
-            # activate down action
-            if angle >= -157.5 and angle < -22.5:
-                action[3] = 1
-            # activate left action
-            if angle >= 112.5 or angle < -112.5:
-                action[1] = 1
-        return action
-
-    def find_next_action(self, world, agents, agent_index):
-        # Initialize vectors on first call to infer number of agents
-        if not self.is_init:
-            self.n_agents = len(agents)
-            self.init()
-
-        # Share all agent positions and preferred velocities from environment with RVO simulator
-        for a in range(self.n_agents):
-            # Copy current agent positions, goal and preferred speeds into np arrays
-            self.pos_agents[a, :] = agents[a].state.p_pos
-            self.goal_agents[a, :] = world.get_entity(
-                "landmark", agents[a].id
-            ).state.p_pos
-            self.vel_agents[a, :] = agents[a].state.p_vel
-            self.pref_speed_agents[a] = agents[a].pref_speed
-
-            # Calculate preferred velocity
-            # Assumes non RVO agents are acting like RVO agents
-            self.pref_vel_agents[a, :] = self.goal_agents[a, :] - self.pos_agents[a, :]
-            self.pref_vel_agents[a, :] = (
-                self.pref_speed_agents[a]
-                / np.linalg.norm(self.pref_vel_agents[a, :])
-                * self.pref_vel_agents[a, :]
-            )
-
-            # Set agent positions and velocities in RVO simulator
-            self.sim.setAgentMaxSpeed(self.rvo_agents[a], agents[a].pref_speed)
-            self.sim.setAgentRadius(self.rvo_agents[a], (1 + 5e-2) * agents[a].radius)
-            self.sim.setAgentPosition(self.rvo_agents[a], tuple(self.pos_agents[a, :]))
-            self.sim.setAgentVelocity(self.rvo_agents[a], tuple(self.vel_agents[a, :]))
-            self.sim.setAgentPrefVelocity(
-                self.rvo_agents[a], tuple(self.pref_vel_agents[a, :])
-            )
-
-        # Set ego agent's collaborativity
-        if self.rvo_collab_coeff < 0:
-            # agent is anti-collaborative ==> every X seconds,
-            # it chooses btwn non-coop and adversarial, where the PMF of
-            # which policy to run is defined by abs(collab_coeff)\in(0,1].
-
-            # if a certain freq, randomly select btwn use non coop policy vs. rvo
-            if (
-                round(agents[agent_index].t % self.rvo_anti_collab_t, 3) < self.dt
-                or round(
-                    self.rvo_anti_collab_t
-                    - agents[agent_index].t % self.rvo_anti_collab_t,
-                    3,
-                )
-                < self.dt
-            ):
-                self.use_non_coop_policy = np.random.choice(
-                    [True, False],
-                    p=[1 - abs(self.rvo_collabb_coeff), abs(self.rvo_collabb_coeff)],
-                )
-            if self.use_non_coop_policy:
-                self.sim.setAgentCollabCoeff(self.rvo_agents[agent_index], 0.0)
+def intersect(pA, vA, RVO_BA_all):
+    # print '----------------------------------------'
+    # print 'Start intersection test'
+    norm_v = distance(vA, [0, 0])
+    suitable_V = []
+    unsuitable_V = []
+    for theta in numpy.arange(0, 2*PI, 0.1):
+        for rad in numpy.arange(0.02, norm_v+0.02, norm_v/5.0):
+            new_v = [rad*cos(theta), rad*sin(theta)]
+            suit = True
+            for RVO_BA in RVO_BA_all:
+                p_0 = RVO_BA[0]
+                left = RVO_BA[1]
+                right = RVO_BA[2]
+                dif = [new_v[0]+pA[0]-p_0[0], new_v[1]+pA[1]-p_0[1]]
+                theta_dif = atan2(dif[1], dif[0])
+                theta_right = atan2(right[1], right[0])
+                theta_left = atan2(left[1], left[0])
+                if in_between(theta_right, theta_dif, theta_left):
+                    suit = False
+                    break
+            if suit:
+                suitable_V.append(new_v)
             else:
-                self.sim.setAgentCollabCoeff(
-                    self.rvo_agents[agent_index], self.rvo_collabb_coeff
-                )
+                unsuitable_V.append(new_v)                
+    new_v = vA[:]
+    suit = True
+    for RVO_BA in RVO_BA_all:                
+        p_0 = RVO_BA[0]
+        left = RVO_BA[1]
+        right = RVO_BA[2]
+        dif = [new_v[0]+pA[0]-p_0[0], new_v[1]+pA[1]-p_0[1]]
+        theta_dif = atan2(dif[1], dif[0])
+        theta_right = atan2(right[1], right[0])
+        theta_left = atan2(left[1], left[0])
+        if in_between(theta_right, theta_dif, theta_left):
+            suit = False
+            break
+    if suit:
+        suitable_V.append(new_v)
+    else:
+        unsuitable_V.append(new_v)
+    #----------------------        
+    if suitable_V:
+        # print 'Suitable found'
+        vA_post = min(suitable_V, key = lambda v: distance(v, vA))
+        new_v = vA_post[:]
+        for RVO_BA in RVO_BA_all:
+            p_0 = RVO_BA[0]
+            left = RVO_BA[1]
+            right = RVO_BA[2]
+            dif = [new_v[0]+pA[0]-p_0[0], new_v[1]+pA[1]-p_0[1]]
+            theta_dif = atan2(dif[1], dif[0])
+            theta_right = atan2(right[1], right[0])
+            theta_left = atan2(left[1], left[0])
+    else:
+        # print 'Suitable not found'
+        tc_V = dict()
+        for unsuit_v in unsuitable_V:
+            tc_V[tuple(unsuit_v)] = 0
+            tc = []
+            for RVO_BA in RVO_BA_all:
+                p_0 = RVO_BA[0]
+                left = RVO_BA[1]
+                right = RVO_BA[2]
+                dist = RVO_BA[3]
+                rad = RVO_BA[4]
+                dif = [unsuit_v[0]+pA[0]-p_0[0], unsuit_v[1]+pA[1]-p_0[1]]
+                theta_dif = atan2(dif[1], dif[0])
+                theta_right = atan2(right[1], right[0])
+                theta_left = atan2(left[1], left[0])
+                if in_between(theta_right, theta_dif, theta_left):
+                    small_theta = abs(theta_dif-0.5*(theta_left+theta_right))
+                    if abs(dist*sin(small_theta)) >= rad:
+                        rad = abs(dist*sin(small_theta))
+                    big_theta = asin(abs(dist*sin(small_theta))/rad)
+                    dist_tg = abs(dist*cos(small_theta))-abs(rad*cos(big_theta))
+                    if dist_tg < 0:
+                        dist_tg = 0                    
+                    tc_v = dist_tg/distance(dif, [0,0])
+                    tc.append(tc_v)
+            tc_V[tuple(unsuit_v)] = min(tc)+0.001
+        WT = 0.2
+        vA_post = min(unsuitable_V, key = lambda v: ((WT/tc_V[tuple(v)])+distance(v, vA)))
+    return vA_post 
+
+def in_between(theta_right, theta_dif, theta_left):
+    if abs(theta_right - theta_left) <= PI:
+        if theta_right <= theta_dif <= theta_left:
+            return True
         else:
-            self.sim.setAgentCollabCoeff(
-                self.rvo_agents[agent_index], self.rvo_collabb_coeff
-            )
+            return False
+    else:
+        if (theta_left <0) and (theta_right >0):
+            theta_left += 2*PI
+            if theta_dif < 0:
+                theta_dif += 2*PI
+            if theta_right <= theta_dif <= theta_left:
+                return True
+            else:
+                return False
+        if (theta_left >0) and (theta_right <0):
+            theta_right += 2*PI
+            if theta_dif < 0:
+                theta_dif += 2*PI
+            if theta_left <= theta_dif <= theta_right:
+                return True
+            else:
+                return False
 
-        # Execute one step in the RVO simulator
-        self.sim.doStep()
-
-        # Calculate desired change of heading
-        self.new_rvo_pos = self.sim.getAgentPosition(self.rvo_agents[agent_index])[:]
-        ########## process new pos to speed and angle ##########
-        deltaPos = self.new_rvo_pos - self.pos_agents[agent_index, :]
-        action = self.convert_to_action(delta_pos=deltaPos)
-        # p1 = deltaPos
-        # p2 = np.array([1,0]) # Angle zero is parallel to x-axis
-        # ang1 = np.arctan2(*p1[::-1])
-        # ang2 = np.arctan2(*p2[::-1])
-        # new_heading_global_frame = (ang1 - ang2) % (2 * np.pi)
-        # delta_heading = wrap(new_heading_global_frame - agents[agent_index].heading_global_frame)
-
-        # # Calculate desired speed
-        # pref_speed = 1/self.dt * np.linalg.norm(deltaPos)
-
-        # # Limit the turning rate: stop and turn in place if exceeds
-        # if abs(delta_heading) > self.max_delta_heading:
-        #     delta_heading = np.sign(delta_heading)*self.max_delta_heading
-        #     pref_speed = 0.
-
-        # # Ignore speed
-        # if self.has_fixed_speed:
-        #     pref_speed = self.max_speed
-
-        # # Add noise
-        # if self.heading_noise:
-        #     delta_heading = delta_heading + np.random.normal(0,0.5)
-
-        # action = np.array([pref_speed, delta_heading])
-        return action
+def compute_V_des(X, goal, V_max):
+    V_des = []
+    for i in range(len(X)):
+        dif_x = [goal[i][k]-X[i][k] for k in range(2)]
+        norm = distance(dif_x, [0, 0])
+        norm_dif_x = [dif_x[k]*V_max[k]/norm for k in range(2)]
+        V_des.append(norm_dif_x[:])
+        if reach(X[i], goal[i], 0.1):
+            V_des[i][0] = 0
+            V_des[i][1] = 0
+    return V_des
+            
+def reach(p1, p2, bound=0.5):
+    if distance(p1,p2)< bound:
+        return True
+    else:
+        return False
+    
+    

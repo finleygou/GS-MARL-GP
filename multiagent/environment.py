@@ -30,6 +30,7 @@ class MultiAgentBaseEnv(gym.Env):
         world: World,
         reset_callback: Callable = None,
         reward_callback: Callable = None,
+        cost_callback: Callable = None,
         observation_callback: Callable = None,
         info_callback: Callable = None,
         done_callback: Callable = None,
@@ -58,7 +59,8 @@ class MultiAgentBaseEnv(gym.Env):
         self.data_ = ()
         self.INFO_flag = 0
         self.collision_num = 0
-        self.reward_all = 0
+        self.reward_all = 0 # for data record
+        self.cost_all = 0 # for data record
         if self.args.gp_type == 'formation':
             self.formation_error = 0
         elif self.args.gp_type == 'encirclement':
@@ -78,6 +80,7 @@ class MultiAgentBaseEnv(gym.Env):
         # scenario callbacks
         self.reset_callback = reset_callback
         self.reward_callback = reward_callback
+        self.cost_callback = cost_callback
         self.observation_callback = observation_callback
         self.info_callback = info_callback
         self.done_callback = done_callback
@@ -226,6 +229,12 @@ class MultiAgentBaseEnv(gym.Env):
             return 0.0
         return self.reward_callback(agent, self.world)
 
+    # get cost for a particular agent
+    def _get_cost(self, agent: Agent) -> float:
+        if self.cost_callback is None:
+            return 0.0
+        return self.cost_callback(agent, self.world)
+
     # set env action for a particular agent
     def _set_action(self, action, policy_u, agent: Agent, action_space, time: Optional = None) -> None:
         agent.action.u = np.zeros(self.world.dim_p)
@@ -315,6 +324,7 @@ class MultiAgentBaseEnv(gym.Env):
                 self.INFO_flag = 0
                 self.collision_num = 0
                 self.reward_all = 0
+                self.cost_all = 0
                 if self.args.gp_type == 'formation':
                     self.formation_error = 0
                 elif self.args.gp_type == 'encirclement':
@@ -612,6 +622,7 @@ class MultiAgentGraphEnv(MultiAgentBaseEnv):
         world: World,
         reset_callback: Callable = None,
         reward_callback: Callable = None,
+        cost_callback: Callable = None,
         observation_callback: Callable = None,
         graph_observation_callback: Callable = None,
         id_callback: Callable = None,
@@ -627,6 +638,7 @@ class MultiAgentGraphEnv(MultiAgentBaseEnv):
             world,
             reset_callback,
             reward_callback,
+            cost_callback,
             observation_callback,
             info_callback,
             done_callback,
@@ -687,7 +699,7 @@ class MultiAgentGraphEnv(MultiAgentBaseEnv):
         if self.update_graph is not None:
             self.update_graph(self.world)
         self.current_step += 1
-        obs_n, reward_n, done_n, info_n = [], [], [], []
+        obs_n, reward_n, cost_n, done_n, info_n = [], [], [], [], []
         node_obs_n, adj_n, agent_id_n = [], [], []
         self.world.current_time_step += 1
         self.agents = self.world.policy_agents
@@ -712,10 +724,10 @@ class MultiAgentGraphEnv(MultiAgentBaseEnv):
             node_obs_n.append(node_obs)
             adj_n.append(adj)
             done_n.append(self._get_done(agent))
-            reward = self._get_reward(agent)
-            reward_n.append([reward])
+            reward_n.append([self._get_reward(agent)])
+            cost_n.append([self._get_cost(agent)])
             done_check.append(agent.done)
-            info = {"individual_reward": reward}
+            info = {}
             env_info = self._get_info(agent)
             info.update(env_info)  # nothing fancy here, just appending dict to dict
             info_n.append(info)
@@ -770,9 +782,12 @@ class MultiAgentGraphEnv(MultiAgentBaseEnv):
 
         # all agents get total reward in cooperative case
         reward = np.sum(reward_n)
+        cost = np.sum(cost_n)
         if self.shared_reward:
             reward_n = [[reward]] * self.n  # NOTE this line is similar to PPOEnv
+            cost_n = [[cost]] * self.n  # NOTE this line is similar to PPOEnv
         self.reward_all += reward  # record total reward over a trajectory
+        self.cost_all += cost  # record total cost over a trajectory
 
         # print("reward_n: ", reward_n)
         # print("node_obs_n: ", node_obs_n[0].shape)
@@ -780,7 +795,7 @@ class MultiAgentGraphEnv(MultiAgentBaseEnv):
         # print("adj_n: ", adj_n[0].shape)
         # print("agent_id_n: ", agent_id_n[0].shape)
 
-        return obs_n, agent_id_n, node_obs_n, adj_n, reward_n, done_n, info_n
+        return obs_n, agent_id_n, node_obs_n, adj_n, reward_n, cost_n, done_n, info_n
 
     def reset(self) -> Tuple[List, List, List, List]:
         self.current_step = 0

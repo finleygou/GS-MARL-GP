@@ -49,6 +49,7 @@ def MPEEnv(args: argparse.Namespace):
         world=world,
         reset_callback=scenario.reset_world,
         reward_callback=scenario.reward,
+        cost_callback=scenario.cost,
         observation_callback=scenario.observation,
         info_callback=scenario.info_callback
         if hasattr(scenario, "info_callback")
@@ -76,6 +77,7 @@ def GraphMPEEnv(args):
         world=world,
         reset_callback=scenario.reset_world,
         reward_callback=scenario.reward,
+        cost_callback=scenario.cost,
         observation_callback=scenario.observation,
         graph_observation_callback=scenario.graph_observation,
         update_graph=scenario.update_graph,
@@ -102,6 +104,7 @@ def GPGMPEEnv(args):
         world=world,
         reset_callback=scenario.reset_world,
         reward_callback=scenario.reward,
+        cost_callback=scenario.cost,
         observation_callback=scenario.observation,
         graph_observation_callback=scenario.graph_observation,
         info_callback=scenario.info_callback,

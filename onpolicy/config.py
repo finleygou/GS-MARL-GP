@@ -94,6 +94,9 @@ def get_config():
         --weight_decay <float>
             coefficience of weight decay (default: 0)
 
+    Safe MARL parameters:
+    
+
     PPO parameters:
         --ppo_epoch <int>
             number of ppo epochs (default: 15)
@@ -187,7 +190,7 @@ def get_config():
     parser.add_argument("--use_wandb", type=lambda x: bool(strtobool(x)), default=True, help="[for wandb usage], by default True, will log date to wandb server. or else will use tensorboard to log data.")
 
     # env parameters
-    parser.add_argument("--env_name", type=str, default="MPE", choices=["MPE", "GraphMPE"], help="specify the name of environment")
+    parser.add_argument("--env_name", type=str, default="MPE", choices=["MPE", "GraphMPE", "GSMPE"], help="specify the name of environment")
     parser.add_argument("--use_obs_instead_of_state", action="store_true", default=False, help="Whether to use global state or concatenated obs")
     parser.add_argument("--world_size", type=float, default=2, help="The world size of MPE; it will range from -world_size/2 to world_size/2")
     parser.add_argument("--num_scripted_agents", type=int, default=0, help="The number of scripted agents in MPE")
@@ -226,6 +229,8 @@ def get_config():
     parser.add_argument("--critic_lr", type=float, default=5e-4, help="critic learning rate (default: 5e-4)")
     parser.add_argument("--opti_eps", type=float, default=1e-5, help="RMSprop optimizer epsilon (default: 1e-5)")
     parser.add_argument("--weight_decay", type=float, default=0)
+    parser.add_argument("--std_x_coef", type=float, default=1)  # tune diagonalGaussian std
+    parser.add_argument("--std_y_coef", type=float, default=0.5)
 
     # ppo parameters
     parser.add_argument("--ppo_epoch", type=int, default=15, help="number of ppo epochs (default: 15)")
@@ -245,8 +250,16 @@ def get_config():
     parser.add_argument("--use_policy_active_masks", action="store_false", default=True,
         help="by default True, whether to mask " "useless data in policy loss.",)
     parser.add_argument("--huber_delta", type=float, default=10.0, help=" coefficience of huber loss.")
-
     
+    # safe MARL parameters
+    parser.add_argument("--safety_bound", type=float, default=1, help="constraint upper bound")
+    parser.add_argument("--lagrangian_coef", type=float, default=0.01,
+                    help='entropy term coefficient (default: 0.01)')
+    parser.add_argument("--lamda_lagr", type=float, default=0.8,
+                    help='lagrangrian coef coefficient (default: 0.8)')
+    parser.add_argument("--lagrangian_coef_rate", type=float, default=5e-4,
+                        help='lagrangrian coef learning rate (default: 5e-4)')
+
     # curriculum learning parameters
     parser.add_argument("--use_policy", type=lambda x: bool(strtobool(x)), default=False, help="use the fixed policy to conduct tasks")
     parser.add_argument("--use_curriculum", type=lambda x: bool(strtobool(x)), default=False, help='use curriculum learning during training')
