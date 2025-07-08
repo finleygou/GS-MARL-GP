@@ -24,13 +24,13 @@ CUDA_VISIBLE_DEVICES='2' python  ../onpolicy/scripts/train_mpe.py \
 --hid_size 64 --layer_N 1 \
 --num_target 0 --num_agents 5 --num_obstacle 4 --num_dynamic_obs 4 \
 --gp_type "formation" \
---save_data "False" \
+--save_data "True" \
 --reward_file_name "r_formation_5agts" \
 --use_policy "False" \
 --use_curriculum "False" \
 --guide_cp 0.6 --cp 0.4 --js_ratio 0.8 \
 --use_wandb "False" \
---n_training_threads 8 --n_rollout_threads 1 \
+--n_training_threads 16 --n_rollout_threads 32 \
 --use_lstm "True" \
 --episode_length ${ep_lens} \
 --num_env_steps 6000000 \

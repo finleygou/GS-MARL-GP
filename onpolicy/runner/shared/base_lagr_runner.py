@@ -151,27 +151,21 @@ class Runner(object):
     def train(self):
         """Train policies with data in buffer, including safety-related data."""
         self.trainer.prep_training()
-        
         # Initialize factor for Lagrangian method
         action_dim = self.buffer.actions.shape[-1]
         factor = np.ones((self.episode_length, self.n_rollout_threads, self.num_agents, action_dim), dtype=np.float32)
         self.buffer.update_factor(factor)
 
-        # Prepare available actions
-        available_actions = None if self.buffer.available_actions is None \
-            else self.buffer.available_actions[:-1].reshape(-1, *self.buffer.available_actions.shape[3:])
-
-        # Compute old action log probabilities
         old_actions_logprob, _ = self.trainer.policy.actor.evaluate_actions(
             self.buffer.obs[:-1].reshape(-1, *self.buffer.obs.shape[3:]),
+            self.buffer.node_obs[:-1].reshape(-1, *self.buffer.node_obs.shape[3:]),
+            self.buffer.adj[:-1].reshape(-1, *self.buffer.adj.shape[3:]),
+            self.buffer.agent_id[:-1].reshape(-1, *self.buffer.agent_id.shape[3:]),
             self.buffer.rnn_states[0:1].reshape(-1, *self.buffer.rnn_states.shape[3:]),
             self.buffer.actions.reshape(-1, *self.buffer.actions.shape[3:]),
             self.buffer.masks[:-1].reshape(-1, *self.buffer.masks.shape[3:]),
-            available_actions,
-            self.buffer.active_masks[:-1].reshape(-1, *self.buffer.active_masks.shape[3:]),
-            self.buffer.node_obs[:-1].reshape(-1, *self.buffer.node_obs.shape[3:]),
-            self.buffer.adj[:-1].reshape(-1, *self.buffer.adj.shape[3:]),
-            self.buffer.agent_id[:-1].reshape(-1, *self.buffer.agent_id.shape[3:])
+            available_actions=self.buffer.available_actions[:-1],
+            active_masks=self.buffer.active_masks[:-1].reshape(-1, *self.buffer.active_masks.shape[3:])
         )
 
         # Train with buffer data and cost advantage
@@ -180,17 +174,16 @@ class Runner(object):
         # Compute new action log probabilities and update factor
         new_actions_logprob, _ = self.trainer.policy.actor.evaluate_actions(
             self.buffer.obs[:-1].reshape(-1, *self.buffer.obs.shape[3:]),
+            self.buffer.node_obs[:-1].reshape(-1, *self.buffer.node_obs.shape[3:]),
+            self.buffer.adj[:-1].reshape(-1, *self.buffer.adj.shape[3:]),
+            self.buffer.agent_id[:-1].reshape(-1, *self.buffer.agent_id.shape[3:]),
             self.buffer.rnn_states[0:1].reshape(-1, *self.buffer.rnn_states.shape[3:]),
             self.buffer.actions.reshape(-1, *self.buffer.actions.shape[3:]),
             self.buffer.masks[:-1].reshape(-1, *self.buffer.masks.shape[3:]),
-            available_actions,
-            self.buffer.active_masks[:-1].reshape(-1, *self.buffer.active_masks.shape[3:]),
-            self.buffer.node_obs[:-1].reshape(-1, *self.buffer.node_obs.shape[3:]),
-            self.buffer.adj[:-1].reshape(-1, *self.buffer.adj.shape[3:]),
-            self.buffer.agent_id[:-1].reshape(-1, *self.buffer.agent_id.shape[3:])
+            available_actions=self.buffer.available_actions[:-1],
+            active_masks=self.buffer.active_masks[:-1].reshape(-1, *self.buffer.active_masks.shape[3:])
         )
 
-        # ***************************************************** factor的结构？还要修改。不知道是否有num-agents
         factor = factor * _t2n(torch.exp(new_actions_logprob - old_actions_logprob).reshape(
             self.episode_length, self.n_rollout_threads, self.num_agents, action_dim))
         

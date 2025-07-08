@@ -67,6 +67,8 @@ class GSMPERunner(Runner):
                     rnn_states_cost,
                 ) = self.collect(step)
 
+                # print("rnn_states:", rnn_states)
+
                 # Obs reward and next obs
                 obs, agent_id, node_obs, adj, rewards, costs, dones, infos = self.envs.step(actions_env)
 
@@ -75,7 +77,6 @@ class GSMPERunner(Runner):
                     agent_id,
                     node_obs,
                     adj,
-                    agent_id,
                     rewards,
                     costs,
                     dones,
@@ -113,12 +114,9 @@ class GSMPERunner(Runner):
 
                 avg_ep_rew = np.mean(self.buffer.rewards) * self.episode_length
                 train_infos["average_episode_rewards"] = avg_ep_rew
-                # print(
-                #     f"Average episode rewards is {avg_ep_rew:.3f} \t"
-                #     f"Total timesteps: {total_num_steps} \t "
-                #     f"Percentage complete {total_num_steps / self.num_env_steps * 100:.3f} \t "
-                #     f"CL ratio: {glv.get_value('CL_ratio')}"
-                # )
+                avg_ep_cost = np.mean(self.buffer.costs) * self.episode_length
+                train_infos["average_episode_costs"] = avg_ep_cost
+      
                 print("\n Scenario {} Algo {} Exp {} updates {}/{} episodes, total num timesteps {}/{}, FPS {}, CL {}.\n"
                         .format(self.all_args.scenario_name,
                                 self.algorithm_name,
@@ -130,6 +128,8 @@ class GSMPERunner(Runner):
                                 int(total_num_steps / (end - start)),
                                 format(glv.get_value('CL_ratio'), '.3f')))
                 print("average episode rewards is {}".format(avg_ep_rew))
+                print("average episode costs is {}".format(avg_ep_cost))
+
                 self.log_train(train_infos, total_num_steps)
                 self.log_env(env_infos, total_num_steps)
 
@@ -242,7 +242,6 @@ class GSMPERunner(Runner):
             agent_id,
             node_obs,
             adj,
-            agent_id,
             rewards,
             costs,
             dones,
@@ -319,6 +318,7 @@ class GSMPERunner(Runner):
             np.concatenate(self.buffer.rnn_states_critic[-1]),
             np.concatenate(self.buffer.masks[-1]),
         )
+        # print("next_values:", next_values.shape) # [5,1]
         next_values = np.array(np.split(_t2n(next_values), self.n_rollout_threads))
 
         next_costs = self.trainer.policy.get_cost_values(
