@@ -27,6 +27,7 @@ class GSMPERunner(Runner):
         self.use_train_render = self.all_args.use_train_render
         self.no_imageshow = self.all_args.no_imageshow
         self.reward_file_name = self.all_args.reward_file_name
+        self.cost_file_name = self.all_args.cost_file_name
         if self.use_train_render:
             print("render the image while training")
 
@@ -38,6 +39,11 @@ class GSMPERunner(Runner):
             writer = csv.writer(file)
             writer.writerow(['step', 'average', 'min', 'max', 'std'])
             file.close()
+
+            file1 = open(self.cost_file_name+'.csv', 'w', encoding='utf-8', newline="")
+            writer1 = csv.writer(file1)
+            writer1.writerow(['step', 'average', 'min', 'max', 'std'])
+            file1.close()
 
         self.warmup()
 
@@ -134,16 +140,20 @@ class GSMPERunner(Runner):
                 self.log_env(env_infos, total_num_steps)
 
                 r = self.buffer.rewards.mean(2).sum(axis=(0, 2))
-                Average = np.mean(r)
-                Min = np.min(r)
-                Max = np.max(r)
-                Std = np.std(r)
+                c = self.buffer.costs.mean(2).sum(axis=(0, 2))
+                Average_r, Min_r, Max_r, Std_r = np.mean(r), np.min(r), np.max(r), np.std(r)
+                Average_c, Min_c, Max_c, Std_c = np.mean(c), np.min(c), np.max(c), np.std(c)
 
                 if self.save_data:
                     file = open(self.reward_file_name+'.csv', 'a', encoding='utf-8', newline="")
                     writer = csv.writer(file)
-                    writer.writerow([total_num_steps, Average, Min, Max, Std])
+                    writer.writerow([total_num_steps, Average_r, Min_r, Max_r, Std_r])
                     file.close()
+
+                    file1 = open(self.cost_file_name+'.csv', 'a', encoding='utf-8', newline="")
+                    writer1 = csv.writer(file1)
+                    writer1.writerow([total_num_steps, Average_c, Min_c, Max_c, Std_c])
+                    file1.close()
 
             # eval
             if episode % self.eval_interval == 0 and self.use_eval:

@@ -30,7 +30,7 @@ def make_render_env(all_args: argparse.Namespace):
         def init_env():
             if all_args.env_name == "MPE":
                 env = MPEEnv(all_args)
-            elif all_args.env_name == "GraphMPE":
+            elif all_args.env_name == "GraphMPE" or all_args.env_name == "GSMPE":
                 env = GraphMPEEnv(all_args)
             else:
                 print(f"Can not support the {all_args.env_name} environment.")
@@ -41,11 +41,11 @@ def make_render_env(all_args: argparse.Namespace):
         return init_env
 
     if all_args.n_rollout_threads == 1:
-        if all_args.env_name == "GraphMPE":
+        if all_args.env_name == "GraphMPE" or all_args.env_name == "GSMPE":
             return GraphDummyVecEnv([get_env_fn(0)])
         return DummyVecEnv([get_env_fn(0)])
     else:
-        if all_args.env_name == "GraphMPE":
+        if all_args.env_name == "GraphMPE" or all_args.env_name == "GSMPE":
             return GraphSubprocVecEnv(
                 [get_env_fn(i) for i in range(all_args.n_rollout_threads)]
             )
@@ -140,7 +140,7 @@ def main(args):
     parser = get_config()
     all_args = parse_args(args, parser)
     # all_args = modify_args(all_args.model_dir, all_args)
-    if all_args.env_name == "GraphMPE":
+    if all_args.env_name == "GraphMPE" or all_args.env_name == "GSMPE":
         from onpolicy.config import graph_config
 
         all_args, parser = graph_config(args, parser)
@@ -192,6 +192,8 @@ def main(args):
     if all_args.share_policy:
         if all_args.env_name == "GraphMPE":
             from onpolicy.runner.shared.graph_mpe_runner import GMPERunner as Runner
+        elif all_args.env_name == "GSMPE":
+            from onpolicy.runner.shared.graph_lagr_mpe_runner import GSMPERunner as Runner
         else:
             from onpolicy.runner.shared.mpe_runner import MPERunner as Runner
     else:
