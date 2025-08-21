@@ -31,7 +31,7 @@ CUDA_VISIBLE_DEVICES='2' python  ../onpolicy/scripts/train_mpe.py \
 --use_curriculum "True" \
 --guide_cp 0.6 --cp 0.4 --js_ratio 0.8 \
 --use_wandb "False" \
---n_training_threads 16 --n_rollout_threads 32 \
+--n_training_threads 16 --n_rollout_threads 2 \
 --use_lstm "True" \
 --episode_length ${ep_lens} \
 --num_env_steps 6000000 \

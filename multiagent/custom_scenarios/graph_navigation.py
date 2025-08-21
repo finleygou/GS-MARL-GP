@@ -17,14 +17,14 @@ from multiagent.custom_scenarios.util import *
 from multiagent.core import World, Agent, Entity, Target, Obstacle, DynamicObstacle
 from multiagent.scenario import BaseScenario
 
-entity_mapping = {"agent": 0, "target": 1, "dynamic_obstacle": 2, "obstacle": 3}
+entity_mapping = {"agent": 0, "target": 1, "obstacle": 2}
 
 class Scenario(BaseScenario):
 
     def __init__(self) -> None:
         super().__init__()
-        self.band_init = 0.3
-        self.band_target = 0.1
+        self.band_init = 0.1/3
+        self.band_target = 0.1/3
         self.d_lft_band = self.band_target
 
     def make_world(self, args: argparse.Namespace) -> World:
@@ -52,39 +52,44 @@ class Scenario(BaseScenario):
         world.graph_mode = True
         world.graph_feat_type = args.graph_feat_type
         world.world_length = args.episode_length
-        world.collaborative = False
+        world.collaborative = True
+        self.world_size = np.sqrt(16*args.num_agents/3)
 
         world.max_edge_dist = self.max_edge_dist
         world.egos = [Agent() for i in range(self.num_egos)]
         world.obstacles = [Obstacle() for i in range(self.num_obs)]
+        world.targets = [Target() for i in range(self.num_target)]
         world.dynamic_obstacles = [DynamicObstacle() for i in range(self.num_dynamic_obs)]
-        world.agents = world.egos + world.targets + world.dynamic_obstacles
+        world.agents = world.egos + world.dynamic_obstacles  # cannot add targets here, which is static
         
         # add agents
         global_id = 0
         for i, ego in enumerate(world.egos):
             ego.id = i
-            ego.size = 0.12
+            ego.size = 0.1
             ego.R = ego.size
-            # ego.color = np.array([0.95, 0.45, 0.45])
+            ego.color = np.array([0.95, 0.45, 0.45])
             ego.max_speed = 0.5
             ego.max_accel = 0.5
+            ego.delta = 0
             ego.global_id = global_id
             global_id += 1
 
-        for i, d_obs in enumerate(world.dynamic_obstacles):
-            d_obs.id = i
-            d_obs.color = np.array([0.95, 0.65, 0.0])
-            d_obs.size = 0.12
-            d_obs.R = d_obs.size
-            d_obs.max_speed = 0.3
-            d_obs.max_accel = 0.5
-            d_obs.t = 0  # open loop, record time
-            d_obs.global_id = global_id
+        for i, target in enumerate(world.targets):
+            target.id = i
+            target.size = 0.1
+            target.R = target.size
+            target.color = np.array([0.95, 0.95, 0.00])
+            target.max_speed = 0
+            target.max_accel = 0
+            target.global_id = global_id
             global_id += 1
 
         for i, obs in enumerate(world.obstacles):
             obs.id = i
+            obs.size = 0.15
+            obs.R = obs.size
+            obs.delta = 0
             obs.color = np.array([0.45, 0.45, 0.95])
             obs.global_id = global_id
             global_id += 1
@@ -104,45 +109,55 @@ class Scenario(BaseScenario):
         world.num_obstacle_collisions = np.zeros(self.num_egos)
         world.num_agent_collisions = np.zeros(self.num_egos)
 
-        # self.assign_list = rand_assign_targets(self.num_egos, self.num_egos)  
-        # [0,1,2],[0,2,1],[1,0,2],[1,2,0],[2,0,1],[2,1,0]
-        self.assign_list = [2,1,0]
-        goal_pos = np.array([[-0.9, 3.6], [0.1, 4.0], [1.1, 4.4]])
-        init_pos_ego = np.array([[-0.8, 0.], [0.0, 0.0], [0.8, 0.0]])
-        init_pos_ego = init_pos_ego + np.random.randn(*init_pos_ego.shape)*0.01
-        color_list = [np.array([0.95, 0.45, 0.45]), np.array([0.95, 0.95, 0.00]), 
-                      np.array([0.45, 0.95, 0.45]), np.array([0.95, 0.75, 0.80]),
-                      np.array([0.45, 0.0, 0.45]), np.array([0.6, 0.4, 0.2])]
-        for i, ego in enumerate(world.egos):
-            ego.done = False
-            ego.state.p_pos = init_pos_ego[i]
-            ego.state.p_vel = np.array([0.0, 0.0])
-            ego.state.V = np.linalg.norm(ego.state.p_vel)
-            ego.state.phi = np.pi
-            ego.goal = goal_pos[self.assign_list[i]] 
-            ego.color = color_list[i]
-            ego.goal_color = color_list[i]
+        # Randomly place agents and landmarks
+        for obstacle in world.obstacles:
+            obstacle.state.p_pos = 0.8 * np.random.uniform(
+                -self.world_size / 2, self.world_size / 2, world.dim_p
+            )
+            obstacle.state.p_vel = np.zeros(world.dim_p)
 
-        init_pos_d_obs = np.array([[-3., 4.5], [3., 3.5], [-3., 7.0], [3., 6.]])
-        init_direction = np.array([[1., -0.5], [-1., -0.5], [1., -0.5], [-1., -0.5]])
-        for i, d_obs in enumerate(world.dynamic_obstacles):
-            d_obs.done = False
-            d_obs.t = 0
-            d_obs.delta = 0.1
-            d_obs.state.p_pos = init_pos_d_obs[i]
-            d_obs.direction = init_direction[i]
-            d_obs.state.p_vel = d_obs.direction*d_obs.max_speed/np.linalg.norm(d_obs.direction)
-            d_obs.action_callback = dobs_policy
+        # set agents at random positions not colliding with obstacles
+        num_agents_added = 0
+        agents_added = []
+        while True:
+            if num_agents_added == self.num_egos:
+                break
+            random_pos = np.random.uniform(
+                -self.world_size / 2, self.world_size / 2, world.dim_p
+            )
+            agent_size = world.egos[num_agents_added].size
+            obs_collision = self.is_obstacle_collision(random_pos, agent_size, world)
+            agent_collision = self.check_agent_collision(
+                random_pos, agent_size, agents_added
+            )
+            if not obs_collision and not agent_collision:
+                world.egos[num_agents_added].state.p_pos = random_pos
+                world.egos[num_agents_added].state.p_vel = np.zeros(world.dim_p)
+                agents_added.append(world.egos[num_agents_added])
+                num_agents_added += 1
 
-        init_pos_obs = np.array([[-1.4, 0.7], [-0.2, 1.0], [0.1, 2.4], [1.4, 0.6]])
-        self.sizes_obs = np.array([0.16, 0.18, 0.2, 0.17])
-        for i, obs in enumerate(world.obstacles):
-            obs.done = False
-            obs.state.p_pos = init_pos_obs[i]
-            obs.state.p_vel = np.array([0.0, 0.0])
-            obs.R = self.sizes_obs[i]
-            obs.delta = 0.1
-            obs.Ls = obs.R + obs.delta  
+        num_targets_added = 0
+        targets_added = []
+        while True:
+            if num_targets_added == self.num_egos:
+                break
+            random_pos = 0.8 * np.random.uniform(
+                -self.world_size / 2, self.world_size / 2, world.dim_p
+            )
+            target_size = world.targets[num_targets_added].size
+            obs_collision = self.is_obstacle_collision(random_pos, target_size, world)
+            target_collision = self.is_target_collision(
+                random_pos, target_size, world.targets[:num_targets_added]
+            )
+            if not target_collision and not obs_collision:
+                world.targets[num_targets_added].state.p_pos = random_pos
+                world.targets[num_targets_added].state.p_vel = np.zeros(world.dim_p)
+                num_targets_added += 1
+        
+        # for i in range(len(world.egos)):
+        #     print(f"Agent {i} position: {world.egos[i].state.p_pos}")
+        #     print(f"Obstacle {i} position: {world.obstacles[i].state.p_pos}")
+        #     print(f"Target {i} position: {world.targets[i].state.p_pos}")
 
         world.calculate_distances()
         self.update_graph(world)
@@ -179,17 +194,17 @@ class Scenario(BaseScenario):
         #         d_obs.R = 0.05
         #         d_obs.delta = 0.05
 
-        for i, obs in enumerate(obstacles):
-            obs.R = self.sizes_obs[i]
-            obs.delta = 0.1
-        for i, d_obs in enumerate(dynamic_obstacles):
-            d_obs.R = d_obs.size
-            d_obs.delta = 0.1
+        # for i, obs in enumerate(obstacles):
+        #     obs.R = self.sizes_obs[i]
+        #     obs.delta = 0.1
+        # for i, d_obs in enumerate(dynamic_obstacles):
+        #     d_obs.R = d_obs.size
+        #     d_obs.delta = 0.1
 
-        if CL_ratio < self.cp:
-            self.d_lft_band = self.band_init - (self.band_init - self.band_target)*CL_ratio/self.cp
-        else:
-            self.d_lft_band = self.band_target
+        # if CL_ratio < self.cp:
+        #     self.d_lft_band = self.band_init - (self.band_init - self.band_target)*CL_ratio/self.cp
+        # else:
+        #     self.d_lft_band = self.band_target
 
     def info_callback(self, agent: Agent, world: World) -> Tuple:
         if agent.collide:
@@ -224,6 +239,28 @@ class Scenario(BaseScenario):
                 break
         return collision
 
+    def check_agent_collision(self, pos, agent_size, agent_added) -> bool:
+        collision = False
+        if len(agent_added):
+            for agent in agent_added:
+                delta_pos = agent.state.p_pos - pos
+                dist = np.linalg.norm(delta_pos)
+                if dist < (agent.size + agent_size):
+                    collision = True
+                    break
+        return collision
+
+    def is_target_collision(self, pos, size: float, target_list: list) -> bool:
+        collision = False
+        for target in target_list:
+            delta_pos = target.state.p_pos - pos
+            dist = np.sqrt(np.sum(np.square(delta_pos)))
+            dist_min = size + target.size
+            if dist < dist_min:
+                collision = True
+                break
+        return collision
+
     # check collision of agent with another agent
     def is_collision(self, agent1: Agent, agent2: Agent) -> bool:
         delta_pos = agent1.state.p_pos - agent2.state.p_pos
@@ -240,46 +277,66 @@ class Scenario(BaseScenario):
         else:  agent.done = False
         return False
 
+    def cost(self, agent: Agent, world: World) -> float:
+        # the cost is the number of collisions with obstacles and other agents
+        # similar to Num_agent_collisions in info_callback
+        if self.use_CL:
+            self.set_CL(glv.get_value('CL_ratio'), world)
+        cost = 0.0
+        if agent.collide:
+            # cost for colliding with obstacles
+            for obstacle in world.obstacles:
+                delta_pos = obstacle.state.p_pos - agent.state.p_pos
+                dist = np.linalg.norm(delta_pos)
+                dist_min = obstacle.R + agent.R
+                if dist < dist_min:
+                    cost += 1.0
+            # cost for colliding with other agents
+            for a in world.agents:
+                if a is agent:
+                    continue
+                if self.is_collision(agent, a):
+                    cost += 1.0
+        
+        return cost
+
     def reward(self, agent: Agent, world: World) -> float:
         if self.use_CL:
             self.set_CL(glv.get_value('CL_ratio'), world)
         
         egos = world.egos
         obstacles = world.obstacles
-        dynamic_obstacles = world.dynamic_obstacles
-      
-        r_ca = 0
-        penalty = 20
-        collision_flag = False
+        # dynamic_obstacles = world.dynamic_obstacles
+        
+        rew = 0
+        penalty = 5
+        # collision_flag = False
         for ego in egos:
             if ego == agent: pass
             else:
                 if self.is_collision(agent, ego):
-                    r_ca += -1*penalty
+                    rew += -1*penalty
                     collision_flag = True
         for obs in obstacles:
             if self.is_collision(agent, obs):
-                r_ca += -1*penalty
-                collision_flag = True
-        for d_obs in dynamic_obstacles:
-            if self.is_collision(agent, d_obs):
-                r_ca += -1*penalty
+                rew += -1*penalty
                 collision_flag = True
 
-        k = 0.3
-        dist_to_goal = np.linalg.norm(agent.state.p_pos - agent.goal)
-        r_d = np.exp(-k*dist_to_goal)
-        if dist_to_goal<self.d_lft_band and not collision_flag:
-            r_d += 5
-            # agent.done = True
+        goal = world.targets[agent.id]
 
-        r_step = r_d + r_ca
+        dist_to_goal = np.sqrt(
+            np.sum(np.square(agent.state.p_pos - goal.state.p_pos))
+        )
+        if dist_to_goal < agent.size/3:
+            rew += 10
+        else:
+            rew -= dist_to_goal
 
         # agent.done = self.done(agent, world)
         # print("step:", world.world_step)
         # print("ego id:", agent.id, "collide:", collision_flag)
 
-        return r_step
+        return rew
 
     def observation(self, agent: Agent, world: World) -> arr:
         """
@@ -287,7 +344,8 @@ class Scenario(BaseScenario):
             [agent_pos, agent_vel, goal_pos]
         """
         goal_pos = []
-        goal_pos.append(agent.goal - agent.state.p_pos)
+        id = agent.id
+        goal_pos.append(world.targets[id].state.p_pos - agent.state.p_pos)
         return np.concatenate([agent.state.p_pos, agent.state.p_vel] + goal_pos)  # dim = 6
 
     def get_id(self, agent: Agent) -> arr:
@@ -349,6 +407,7 @@ class Scenario(BaseScenario):
         pos = entity.state.p_pos
         vel = entity.state.p_vel
         Radius = entity.R
+        id = entity.id
         if "agent" in entity.name:
             entity_type = entity_mapping["agent"]
         elif "target" in entity.name:
@@ -360,7 +419,7 @@ class Scenario(BaseScenario):
         else:
             raise ValueError(f"{entity.name} not supported")
 
-        return np.hstack([pos, vel, Radius, entity_type])
+        return np.hstack([pos, vel, entity_type])
 
     def _get_entity_feat_relative(self, agent: Agent, entity: Entity, world: World) -> arr:
         """
@@ -373,18 +432,17 @@ class Scenario(BaseScenario):
         pos = agent.state.p_pos - entity.state.p_pos
         vel = agent.state.p_vel - entity.state.p_vel
         Radius = entity.R
+        id = entity.id
         if "agent" in entity.name:
             entity_type = entity_mapping["agent"]
         elif "target" in entity.name:
             entity_type = entity_mapping["target"]
-        elif "dynamic_obstacle" in entity.name:
-            entity_type = entity_mapping["dynamic_obstacle"]
         elif "obstacle" in entity.name:
             entity_type = entity_mapping["obstacle"]
         else:
             raise ValueError(f"{entity.name} not supported")
 
-        return np.hstack([pos, vel, Radius, entity_type])  # dim = 6
+        return np.hstack([pos, vel, entity_type])  # dim = 5
 
 def dobs_policy(agent, obstacles, dobs):
     action = agent.action

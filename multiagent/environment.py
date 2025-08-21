@@ -708,7 +708,10 @@ class MultiAgentGraphEnv(MultiAgentBaseEnv):
         # print("step: ", self.current_step)
 
         # set action for each agent
-        policy_u = self.policy_u(self.world, self.gp_type)
+        if self.use_CL:
+            policy_u = self.policy_u(self.world, self.gp_type)
+        else:
+            policy_u = np.zeros((self.num_agents, 2, 1))
         for i, agent in enumerate(self.agents):  # adversaries only
             self._set_action(action_n[i], policy_u[i], agent, self.action_space[i])
 

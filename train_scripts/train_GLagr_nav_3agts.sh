@@ -5,31 +5,34 @@ seed_max=1
 n_agents=3
 # graph_feat_types=("global" "global" "relative" "relative")
 # cent_obs=("True" "False" "True" "False")
-ep_lens=200
+ep_lens=100
+export WANDB_BASE_URL=https://api.bandw.top
 
 for seed in `seq ${seed_max}`;
 do
 # seed=`expr ${seed} + 1`
 echo "seed: ${seed}"
 # execute the script with different params
-CUDA_VISIBLE_DEVICES='3' python  ../onpolicy/scripts/train_mpe.py \
+CUDA_VISIBLE_DEVICES='0' python  ../onpolicy/scripts/train_mpe.py \
 --use_valuenorm --use_popart \
---project_name "GP_Graph" \
---env_name "GraphMPE" \
+--project_name "GS_GP" \
+--env_name "GSMPE" \
 --algorithm_name "rmappo" \
 --seed ${seed} \
 --experiment_name "check" \
---scenario_name "graph_navigation_3agts" \
---clip_param 0.15 --gamma 0.985 \
+--scenario_name "graph_navigation" \
+--max_edge_dist 1 \
+--clip_param 0.15 --gamma 0.98 \
 --hidden_size 64 --layer_N 1 \
---num_target 0 --num_agents 3 --num_obstacle 4 --num_dynamic_obs 4 \
---gp_type "navigation_rvo" \
+--num_target 3 --num_agents 3 --num_obstacle 3 --num_dynamic_obs 0 \
+--gp_type "navigation" \
 --save_data "True" \
---reward_file_name "r_navigation_3agts-RVO" \
+--reward_file_name "r_navigation_3agts" \
+--cost_file_name "c_navigation_3agts" \
 --use_policy "False" \
---use_curriculum "True" \
---guide_cp 0.4 --cp 0.4 --js_ratio 0.65 \
---use_wandb "True" \
+--use_curriculum "False" \
+--guide_cp 0.4 --cp 0.4 --js_ratio 0.6 \
+--use_wandb "False" \
 --n_training_threads 16 --n_rollout_threads 32 \
 --use_lstm "True" \
 --episode_length ${ep_lens} \

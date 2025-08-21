@@ -209,6 +209,7 @@ def guide_policy_navigation(world):
     egos = world.egos
     dynamic_obstacles = world.dynamic_obstacles
     obstacles = world.obstacles
+    targets = world.targets
     num_egos = len(egos)
     U = np.zeros((num_egos, 2, 1))
 
@@ -227,8 +228,8 @@ def guide_policy_navigation(world):
                 neighbors_id.append(edge_list[1][j])
             if int(edge_list[0][j]) > ego.global_id:
                 break
-
-        f_goal = k1 * (ego.goal - ego.state.p_pos)
+        
+        f_goal = k1 * (targets[i].state.p_pos - ego.state.p_pos)
 
         # print("ego", i, "neighbors_id", neighbors_id)
         neighbors_ego = [e for e in egos if e.global_id in neighbors_id]
