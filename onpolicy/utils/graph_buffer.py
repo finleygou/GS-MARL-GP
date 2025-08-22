@@ -176,6 +176,14 @@ class GraphReplayBuffer(object):
             dtype=np.float32,
         )
 
+        self.costs = np.zeros_like(self.rewards)  # Added for cost storage
+
+        # Average episode costs
+        self.aver_episode_costs = np.zeros(
+            (self.episode_length + 1, self.n_rollout_threads, num_agents, *obs_shape),
+            dtype=np.float32,
+        )  # Added for average episode costs
+
         self.masks = np.ones(
             (self.episode_length + 1, self.n_rollout_threads, num_agents, 1),
             dtype=np.float32,
@@ -199,6 +207,7 @@ class GraphReplayBuffer(object):
         action_log_probs: arr,
         value_preds: arr,
         rewards: arr,
+        costs: arr,
         masks: arr,
         bad_masks: arr = None,
         active_masks: arr = None,
@@ -254,6 +263,7 @@ class GraphReplayBuffer(object):
         self.action_log_probs[self.step] = action_log_probs.copy()
         self.value_preds[self.step] = value_preds.copy()
         self.rewards[self.step] = rewards.copy()
+        self.costs[self.step] = costs.copy()
         self.masks[self.step + 1] = masks.copy()
         if bad_masks is not None:
             self.bad_masks[self.step + 1] = bad_masks.copy()

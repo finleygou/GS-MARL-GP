@@ -13,7 +13,7 @@ do
 # seed=`expr ${seed} + 1`
 echo "seed: ${seed}"
 # execute the script with different params
-CUDA_VISIBLE_DEVICES='0' python  ../onpolicy/scripts/train_mpe.py \
+CUDA_VISIBLE_DEVICES='2' python  ../onpolicy/scripts/train_mpe.py \
 --use_valuenorm --use_popart \
 --project_name "GS_GP" \
 --env_name "GraphMPE" \
@@ -22,22 +22,22 @@ CUDA_VISIBLE_DEVICES='0' python  ../onpolicy/scripts/train_mpe.py \
 --experiment_name "check" \
 --scenario_name "graph_navigation" \
 --max_edge_dist 1 \
---clip_param 0.15 --gamma 0.98 \
---hidden_size 64 --layer_N 1 \
+--clip_param 0.15 --gamma 0.99 \
+--hidden_size 64 --layer_N 2 \
 --num_target 3 --num_agents 3 --num_obstacle 3 --num_dynamic_obs 0 \
 --gp_type "navigation" \
 --save_data "True" \
---reward_file_name "r_navigation_3agts" \
---cost_file_name "c_navigation_3agts" \
+--reward_file_name "r_navigation_3agts_GT_GP" \
+--cost_file_name "c_navigation_3agts_GT_GP" \
 --use_policy "False" \
---use_curriculum "False" \
+--use_curriculum "True" \
 --guide_cp 0.4 --cp 0.4 --js_ratio 0.6 \
---use_wandb "False" \
---n_training_threads 16 --n_rollout_threads 2 \
+--use_wandb "True" \
+--n_training_threads 16 --n_rollout_threads 32 \
 --use_lstm "True" \
 --episode_length ${ep_lens} \
 --num_env_steps 6000000 \
---ppo_epoch 15 --use_ReLU --gain 0.01 --lr 2e-4 --critic_lr 2e-4 \
+--ppo_epoch 15 --use_ReLU --gain 0.01 --lr 1e-3 --critic_lr 1e-3 \
 --user_name "finleygou" \
 --use_cent_obs "False" \
 --graph_feat_type "relative" \

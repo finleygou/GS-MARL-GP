@@ -17,7 +17,7 @@ from multiagent.custom_scenarios.util import *
 from multiagent.core import World, Agent, Entity, Target, Obstacle, DynamicObstacle
 from multiagent.scenario import BaseScenario
 
-entity_mapping = {"agent": 0, "target": 1, "obstacle": 2}
+entity_mapping = {"agent": 0, "target": 1, "obstacle": 2, "dynamic_obstacle": 3}
 
 class Scenario(BaseScenario):
 
@@ -69,8 +69,8 @@ class Scenario(BaseScenario):
             ego.size = 0.1
             ego.R = ego.size
             ego.color = np.array([0.95, 0.45, 0.45])
-            ego.max_speed = 0.5
-            ego.max_accel = 0.5
+            ego.max_speed = 2.0
+            ego.max_accel = 4.0
             ego.delta = 0
             ego.global_id = global_id
             global_id += 1
@@ -309,7 +309,7 @@ class Scenario(BaseScenario):
         # dynamic_obstacles = world.dynamic_obstacles
         
         rew = 0
-        penalty = 5
+        penalty = 1
         # collision_flag = False
         for ego in egos:
             if ego == agent: pass

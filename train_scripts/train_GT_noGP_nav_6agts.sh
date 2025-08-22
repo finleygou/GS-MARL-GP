@@ -2,7 +2,7 @@
 
 # Run the script
 seed_max=1
-n_agents=3
+n_agents=6
 # graph_feat_types=("global" "global" "relative" "relative")
 # cent_obs=("True" "False" "True" "False")
 ep_lens=100
@@ -13,26 +13,26 @@ do
 # seed=`expr ${seed} + 1`
 echo "seed: ${seed}"
 # execute the script with different params
-CUDA_VISIBLE_DEVICES='0' python  ../onpolicy/scripts/train_mpe.py \
+CUDA_VISIBLE_DEVICES='1' python  ../onpolicy/scripts/train_mpe.py \
 --use_valuenorm --use_popart \
 --project_name "GS_GP" \
---env_name "GSMPE" \
+--env_name "GraphMPE" \
 --algorithm_name "rmappo" \
 --seed ${seed} \
 --experiment_name "check" \
 --scenario_name "graph_navigation" \
 --max_edge_dist 1 \
---clip_param 0.15 --gamma 0.98 \
+--clip_param 0.15 --gamma 0.99 \
 --hidden_size 64 --layer_N 1 \
---num_target 3 --num_agents 3 --num_obstacle 3 --num_dynamic_obs 0 \
+--num_target 6 --num_agents 6 --num_obstacle 6 --num_dynamic_obs 0 \
 --gp_type "navigation" \
 --save_data "True" \
---reward_file_name "r_navigation_3agts" \
---cost_file_name "c_navigation_3agts" \
+--reward_file_name "r_navigation_6agts_GT_noGP" \
+--cost_file_name "c_navigation_6agts_GT_noGP" \
 --use_policy "False" \
 --use_curriculum "False" \
---guide_cp 0.4 --cp 0.4 --js_ratio 0.6 \
---use_wandb "False" \
+--guide_cp 0.4 --cp 0.4 --js_ratio 0.0 \
+--use_wandb "True" \
 --n_training_threads 16 --n_rollout_threads 32 \
 --use_lstm "True" \
 --episode_length ${ep_lens} \

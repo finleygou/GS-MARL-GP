@@ -28,6 +28,7 @@ class GMPERunner(Runner):
         self.use_train_render = self.all_args.use_train_render
         self.no_imageshow = self.all_args.no_imageshow
         self.reward_file_name = self.all_args.reward_file_name
+        self.cost_file_name = self.all_args.cost_file_name
         if self.use_train_render:
             print("render the image while training")
 
@@ -39,6 +40,11 @@ class GMPERunner(Runner):
             writer = csv.writer(file)
             writer.writerow(['step', 'average', 'min', 'max', 'std'])
             file.close()
+
+            file1 = open(self.cost_file_name+'.csv', 'w', encoding='utf-8', newline="")
+            writer1 = csv.writer(file1)
+            writer1.writerow(['step', 'average', 'min', 'max', 'std'])
+            file1.close()
 
         self.warmup()
 
@@ -68,7 +74,7 @@ class GMPERunner(Runner):
                 ) = self.collect(step)
 
                 # Obs reward and next obs
-                obs, agent_id, node_obs, adj, rewards, dones, infos = self.envs.step(
+                obs, agent_id, node_obs, adj, rewards, costs, dones, infos = self.envs.step(
                     actions_env
                 )
 
@@ -79,6 +85,7 @@ class GMPERunner(Runner):
                     adj,
                     agent_id,
                     rewards,
+                    costs,
                     dones,
                     infos,
                     values,
@@ -112,6 +119,9 @@ class GMPERunner(Runner):
 
                 avg_ep_rew = np.mean(self.buffer.rewards) * self.episode_length
                 train_infos["average_episode_rewards"] = avg_ep_rew
+                avg_ep_cost = np.mean(self.buffer.costs) * self.episode_length
+                train_infos["average_episode_costs"] = avg_ep_cost
+
                 # print(
                 #     f"Average episode rewards is {avg_ep_rew:.3f} \t"
                 #     f"Total timesteps: {total_num_steps} \t "
@@ -129,20 +139,26 @@ class GMPERunner(Runner):
                                 int(total_num_steps / (end - start)),
                                 format(glv.get_value('CL_ratio'), '.3f')))
                 print("average episode rewards is {}".format(avg_ep_rew))
+                print("average episode costs is {}".format(avg_ep_cost))
                 self.log_train(train_infos, total_num_steps)
                 self.log_env(env_infos, total_num_steps)
 
                 r = self.buffer.rewards.mean(2).sum(axis=(0, 2))
-                Average = np.mean(r)
-                Min = np.min(r)
-                Max = np.max(r)
-                Std = np.std(r)
+                c = self.buffer.costs.mean(2).sum(axis=(0, 2))
+                Average_r, Min_r, Max_r, Std_r = np.mean(r), np.min(r), np.max(r), np.std(r)
+                Average_c, Min_c, Max_c, Std_c = np.mean(c), np.min(c), np.max(c), np.std(c)
 
                 if self.save_data:
                     file = open(self.reward_file_name+'.csv', 'a', encoding='utf-8', newline="")
                     writer = csv.writer(file)
-                    writer.writerow([total_num_steps, Average, Min, Max, Std])
+                    writer.writerow([total_num_steps, Average_r, Min_r, Max_r, Std_r])
                     file.close()
+
+                    file1 = open(self.cost_file_name+'.csv', 'a', encoding='utf-8', newline="")
+                    writer1 = csv.writer(file1)
+                    writer1.writerow([total_num_steps, Average_c, Min_c, Max_c, Std_c])
+                    file1.close()
+
 
             # eval
             if episode % self.eval_interval == 0 and self.use_eval:
@@ -237,6 +253,7 @@ class GMPERunner(Runner):
             adj,
             agent_id,
             rewards,
+            costs,
             dones,
             infos,
             values,
@@ -287,6 +304,7 @@ class GMPERunner(Runner):
             action_log_probs,
             values,
             rewards,
+            costs,
             masks,
         )
 
@@ -308,6 +326,7 @@ class GMPERunner(Runner):
     @torch.no_grad()
     def eval(self, total_num_steps: int):
         eval_episode_rewards = []
+        eval_episode_costs = []
         eval_obs, eval_agent_id, eval_node_obs, eval_adj = self.eval_envs.reset()
 
         eval_rnn_states = np.zeros(
@@ -361,10 +380,12 @@ class GMPERunner(Runner):
                 eval_node_obs,
                 eval_adj,
                 eval_rewards,
+                eval_costs,
                 eval_dones,
                 eval_infos,
             ) = self.eval_envs.step(eval_actions_env)
             eval_episode_rewards.append(eval_rewards)
+            eval_episode_costs.append(eval_costs)
 
             eval_rnn_states[eval_dones == True] = np.zeros(
                 ((eval_dones == True).sum(), self.recurrent_N, self.hidden_size),
@@ -401,7 +422,8 @@ class GMPERunner(Runner):
         envs = self.envs
 
         all_frames = []
-        rewards_arr, success_rates_arr, num_collisions_arr, frac_episode_arr = (
+        rewards_arr, costs_arr, success_rates_arr, num_collisions_arr, frac_episode_arr = (
+            [],
             [],
             [],
             [],
@@ -431,6 +453,7 @@ class GMPERunner(Runner):
             )
 
             episode_rewards = []
+            episode_costs = []
 
             for step in range(self.episode_length):
                 calc_start = time.time()
@@ -467,10 +490,11 @@ class GMPERunner(Runner):
                     raise NotImplementedError
 
                 # Obser reward and next obs
-                obs, agent_id, node_obs, adj, rewards, dones, infos = envs.step(
+                obs, agent_id, node_obs, adj, rewards, costs, dones, infos = envs.step(
                     actions_env
                 )
                 episode_rewards.append(rewards)
+                episode_costs.append(costs)
 
                 rnn_states[dones == True] = np.zeros(
                     ((dones == True).sum(), self.recurrent_N, self.hidden_size),
@@ -502,6 +526,7 @@ class GMPERunner(Runner):
             frac_episode_arr.append(np.mean(frac))
             success_rates_arr.append(success)
             num_collisions_arr.append(num_collisions)
+            costs_arr.append(np.mean(np.sum(np.array(episode_costs), axis=0)))
 
             # print(np.mean(frac), success)
             # print("Average episode rewards is: " +
