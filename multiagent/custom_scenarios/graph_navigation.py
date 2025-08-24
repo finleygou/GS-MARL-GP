@@ -70,7 +70,7 @@ class Scenario(BaseScenario):
             ego.R = ego.size
             ego.color = np.array([0.95, 0.45, 0.45])
             ego.max_speed = 2.0
-            ego.max_accel = 4.0
+            ego.max_accel = 2.0
             ego.delta = 0
             ego.global_id = global_id
             global_id += 1
@@ -152,6 +152,9 @@ class Scenario(BaseScenario):
             if not target_collision and not obs_collision:
                 world.targets[num_targets_added].state.p_pos = random_pos
                 world.targets[num_targets_added].state.p_vel = np.zeros(world.dim_p)
+                world.egos[num_targets_added].goal = random_pos
+                world.egos[num_targets_added].goal_color = world.targets[num_targets_added].color
+                targets_added.append(world.targets[num_targets_added])
                 num_targets_added += 1
         
         # for i in range(len(world.egos)):
@@ -309,7 +312,7 @@ class Scenario(BaseScenario):
         # dynamic_obstacles = world.dynamic_obstacles
         
         rew = 0
-        penalty = 1
+        penalty = 2
         # collision_flag = False
         for ego in egos:
             if ego == agent: pass

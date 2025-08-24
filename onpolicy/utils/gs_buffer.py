@@ -199,11 +199,14 @@ class GSReplayBuffer(object):
         self.bad_masks = np.ones_like(self.masks)
         self.active_masks = np.ones_like(self.masks)
 
-        # Average episode costs
+        # # Average episode costs
         self.aver_episode_costs = np.zeros(
-            (self.episode_length + 1, self.n_rollout_threads, num_agents, *obs_shape),
+            (self.episode_length + 1, self.n_rollout_threads, num_agents, 1),
             dtype=np.float32,
-        )  # Added for average episode costs
+        )  # Added for average episode costs. Copy format of returns
+        # self.aver_episode_costs = np.zeros((self.n_rollout_threads, num_agents),
+        #     dtype=np.float32,
+        # )  # Added for average episode costs
 
         self.factor = None
         self.step = 0
@@ -235,7 +238,6 @@ class GSReplayBuffer(object):
         costs: np.ndarray = None,
         cost_preds: np.ndarray = None,
         rnn_states_cost: np.ndarray = None,
-        aver_episode_costs = 0,
     ) -> None:
         """
         Insert data into the replay buffer, including safety-related data.
@@ -500,6 +502,16 @@ class GSReplayBuffer(object):
                         + self.costs[step]
                     )
 
+    def compute_average_episode_costs(self):
+        """
+        Compute average episode costs for each agent across all rollout threads.
+        """
+        # Sum costs over the episode length for each agent in each rollout thread
+        total_costs = np.sum(self.costs, axis=0)
+        # Compute average costs by dividing by the number of steps
+        for step in reversed(range(self.aver_episode_costs.shape[0])):
+            self.aver_episode_costs[step] = total_costs
+
     def feed_forward_generator(
         self,
         advantages: np.ndarray,
@@ -596,7 +608,8 @@ class GSReplayBuffer(object):
             cost_adv = cost_adv.reshape(-1, 1)
         if self.factor is not None:
             factor = self.factor.reshape(-1, 1)
-        aver_episode_costs = self.aver_episode_costs[:-1].reshape(-1, *self.aver_episode_costs.shape[3:])
+        # aver_episode_costs = self.aver_episode_costs[:-1].reshape(-1, *self.aver_episode_costs.shape[3:])
+        aver_episode_costs = self.aver_episode_costs[:-1].reshape(-1, 1)
 
         for indices in sampler:
             share_obs_batch = share_obs[indices]
@@ -742,8 +755,9 @@ class GSReplayBuffer(object):
             cost_adv = cost_adv.reshape(-1, batch_size, 1)
         if self.factor is not None:
             factor = self.factor.reshape(-1, batch_size, 1)
-        aver_episode_costs = self.aver_episode_costs.reshape(-1, batch_size, *self.aver_episode_costs.shape[3:])
-
+        # aver_episode_costs = self.aver_episode_costs.reshape(-1, batch_size, *self.aver_episode_costs.shape[3:])
+        aver_episode_costs = self.aver_episode_costs.reshape(-1, batch_size, 1)
+                                                             
         for start_ind in range(0, batch_size, num_envs_per_batch):
             share_obs_batch = []
             obs_batch = []

@@ -56,6 +56,7 @@ class GS_MAPPO():
         self.num_mini_batch = args.num_mini_batch
         self.data_chunk_length = args.data_chunk_length
         self.value_loss_coef = args.value_loss_coef
+        self.cost_value_loss_coef = args.cost_value_loss_coef
         self.entropy_coef = args.entropy_coef
         self.max_grad_norm = args.max_grad_norm       
         self.huber_delta = args.huber_delta
@@ -243,7 +244,7 @@ class GS_MAPPO():
         # Cost critic update
         cost_loss = self.cal_value_loss(cost_values, cost_preds_batch, cost_returns_batch, active_masks_batch)
         self.policy.cost_optimizer.zero_grad()
-        self.scaler.scale(cost_loss * self.value_loss_coef).backward()
+        self.scaler.scale(cost_loss * self.cost_value_loss_coef).backward()
         self.scaler.unscale_(self.policy.cost_optimizer)
         if self._use_max_grad_norm:
             cost_grad_norm = nn.utils.clip_grad_norm_(self.policy.cost_critic.parameters(), self.max_grad_norm)
@@ -254,13 +255,17 @@ class GS_MAPPO():
         # Update Lagrangian coefficient
         if aver_episode_costs is not None:
             delta_lamda_lagr = -(( aver_episode_costs.mean() - self.safety_bound) * (1 - self.gamma) + (imp_weights * cost_adv_targ)).mean().detach()
+            # delta_lamda_lagr = -(( aver_episode_costs.mean() - self.safety_bound) + (imp_weights * cost_adv_targ)).mean().detach()
+            # delta_lamda_lagr = -(aver_episode_costs.mean() - self.safety_bound).mean().detach()
             R_ReLU = torch.nn.ReLU()
             self.lamda_lagr = R_ReLU(self.lamda_lagr - (delta_lamda_lagr * self.lagrangian_coef))
+
+            # print("the average episode costs is: {}, the cost_adv_targ is: {}".format(aver_episode_costs.mean(), cost_adv_targ.mean()))
 
         self.scaler.update()
 
         return (value_loss, critic_grad_norm, policy_loss, dist_entropy, 
-                actor_grad_norm, imp_weights, cost_loss, cost_grad_norm)
+                actor_grad_norm, imp_weights, cost_loss, cost_grad_norm, aver_episode_costs, cost_adv_targ)
 
     def train(self, 
             buffer: GSReplayBuffer, 
@@ -303,6 +308,9 @@ class GS_MAPPO():
         train_info['ratio'] = 0
         train_info['cost_loss'] = 0
         train_info['cost_grad_norm'] = 0
+        train_info['lamda_lagr'] = 0
+        # train_info['avg_epi_costs'] = 0
+        train_info['cost_adv_targ'] = 0
 
         for _ in range(self.ppo_epoch):
             if self._use_recurrent_policy:
@@ -313,7 +321,7 @@ class GS_MAPPO():
                 data_generator = buffer.feed_forward_generator(advantages, self.num_mini_batch, mini_batch_size=self.data_chunks//self.num_mini_batch, cost_adv=cost_adv)
 
             for sample in data_generator:
-                value_loss, critic_grad_norm, policy_loss, dist_entropy, actor_grad_norm, imp_weights, cost_loss, cost_grad_norm = self.ppo_update(sample, update_actor)
+                value_loss, critic_grad_norm, policy_loss, dist_entropy, actor_grad_norm, imp_weights, cost_loss, cost_grad_norm, aver_episode_costs, cost_adv_targ = self.ppo_update(sample, update_actor)
 
                 train_info['value_loss'] += value_loss.item()
                 train_info['policy_loss'] += policy_loss.item()
@@ -323,6 +331,10 @@ class GS_MAPPO():
                 train_info['ratio'] += imp_weights.mean()
                 train_info['cost_loss'] += cost_loss.item()
                 train_info['cost_grad_norm'] += cost_grad_norm
+                train_info['lamda_lagr'] += self.lamda_lagr.item()
+                # train_info['avg_epi_costs'] += aver_episode_costs.mean()
+                train_info['cost_adv_targ'] += cost_adv_targ.mean()
+
 
         num_updates = self.ppo_epoch * self.num_mini_batch
 

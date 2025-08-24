@@ -343,6 +343,7 @@ class GSMPERunner(Runner):
 
         self.buffer.compute_returns(next_values, self.trainer.value_normalizer)
         self.buffer.compute_cost_returns(next_costs, self.trainer.value_normalizer)
+        self.buffer.compute_average_episode_costs()
 
     @torch.no_grad()
     def eval(self, total_num_steps: int):
