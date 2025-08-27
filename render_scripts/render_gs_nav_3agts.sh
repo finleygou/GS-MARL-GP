@@ -17,13 +17,13 @@ do
     --algorithm_name "rmappo" \
     --seed ${seed} \
     --experiment_name "check" \
-    --scenario_name "graph_navigation" \
+    --scenario_name "graph_navigation_fix" \
     --hidden_size 64 \
     --layer_N 2 \
     --use_wandb "False" \
     --save_gifs "False" \
     --use_render "True" \
-    --save_data "False" \
+    --save_data "True" \
     --use_curriculum "False" \
     --use_policy "False" \
     --gp_type "navigation" \
@@ -34,7 +34,6 @@ do
     --n_rollout_threads 1 \
     --use_lstm "True" \
     --episode_length ${ep_lens} \
-    --data_chunk_length 10 \
     --ppo_epoch 15 --use_ReLU --gain 0.01 \
     --user_name "finleygou" \
     --use_cent_obs "False" \
@@ -42,5 +41,5 @@ do
     --use_att_gnn "False" \
     --monte_carlo_test "False" \
     --render_episodes 10 \
-    --model_dir "/data/goufandi_space/Projects/GS-MARL-GP/GS-MARL-GP/onpolicy/results/GSMPE/graph_navigation/rmappo/check/wandb/run-20250822_153822-u3rwu5ur/files/"
+    --model_dir "/data/goufandi_space/Projects/GS-MARL-GP/GS-MARL-GP/onpolicy/results/GSMPE/graph_navigation_fix/rmappo/check/wandb/run-20250826_165235-6spvqnw8/files/"
 done

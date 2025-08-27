@@ -43,6 +43,7 @@ class GS_MAPPOPolicy:
         self.device = device
         self.lr = args.lr
         self.critic_lr = args.critic_lr
+        self.cost_critic_lr = args.cost_critic_lr
         self.opti_eps = args.opti_eps
         self.weight_decay = args.weight_decay
 
@@ -97,7 +98,7 @@ class GS_MAPPOPolicy:
         )
         self.cost_optimizer = torch.optim.Adam(
             self.cost_critic.parameters(),
-            lr=self.critic_lr,
+            lr=self.cost_critic_lr,
             eps=self.opti_eps,
             weight_decay=self.weight_decay,
         )

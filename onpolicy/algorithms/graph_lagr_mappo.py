@@ -84,13 +84,13 @@ class GS_MAPPO():
         # Value and cost normalizers
         if self._use_popart:
             self.value_normalizer = self.policy.critic.v_out
-            self.cost_normalizer = self.policy.cost_critic.v_out
+            # self.cost_normalizer = self.policy.cost_critic.v_out
         elif self._use_valuenorm:
             self.value_normalizer = ValueNorm(1, device=self.device)
-            self.cost_normalizer = ValueNorm(1, device=self.device)
+            # self.cost_normalizer = ValueNorm(1, device=self.device)
         else:
             self.value_normalizer = None
-            self.cost_normalizer = None
+            # self.cost_normalizer = None
 
     def cal_value_loss(self, 
                     values:Tensor, 
@@ -142,6 +142,51 @@ class GS_MAPPO():
             value_loss = value_loss.mean()
 
         return value_loss
+    
+    def cal_cost_v_loss(self, 
+                        values:Tensor, 
+                        value_preds_batch:Tensor, 
+                        return_batch:Tensor, 
+                        active_masks_batch:Tensor) -> Tensor:
+            """
+                Calculate value function loss.
+                values: (torch.Tensor) 
+                    value function predictions.
+                value_preds_batch: (torch.Tensor) 
+                    "old" value  predictions from data batch (used for value clip loss)
+                return_batch: (torch.Tensor) 
+                    reward to go returns.
+                active_masks_batch: (torch.Tensor) 
+                    denotes if agent is active or dead at a given timesep.
+
+                :return value_loss: (torch.Tensor) 
+                    value function loss.
+            """
+            value_pred_clipped = value_preds_batch + (values - 
+                                value_preds_batch).clamp(-self.clip_param,
+                                                        self.clip_param)
+
+            error_clipped = return_batch - value_pred_clipped
+            error_original = return_batch - values
+
+            if self._use_huber_loss:
+                value_loss_clipped = huber_loss(error_clipped, self.huber_delta)
+                value_loss_original = huber_loss(error_original, self.huber_delta)
+            else:
+                value_loss_clipped = mse_loss(error_clipped)
+                value_loss_original = mse_loss(error_original)
+
+            if self._use_clipped_value_loss:
+                value_loss = torch.max(value_loss_original, value_loss_clipped)
+            else:
+                value_loss = value_loss_original
+
+            if self._use_value_active_masks:
+                value_loss = (value_loss * active_masks_batch).sum() / active_masks_batch.sum()
+            else:
+                value_loss = value_loss.mean()
+
+            return value_loss
     
     @torch.cuda.amp.autocast()
     def ppo_update(self, 
@@ -204,7 +249,8 @@ class GS_MAPPO():
         )
 
         # Actor update with Lagrangian hybrid advantage
-        adv_targ_hybrid = adv_targ - self.lamda_lagr * cost_adv_targ if cost_adv_targ is not None else adv_targ
+        adv_targ_hybrid = adv_targ - self.lamda_lagr * cost_adv_targ
+        # adv_targ_hybrid = adv_targ
         imp_weights = torch.exp(action_log_probs - old_action_log_probs_batch)
         surr1 = imp_weights * adv_targ_hybrid
         surr2 = torch.clamp(imp_weights, 1.0 - self.clip_param, 1.0 + self.clip_param) * adv_targ_hybrid
@@ -240,7 +286,15 @@ class GS_MAPPO():
         else:
             critic_grad_norm = get_grad_norm(self.policy.critic.parameters())
         self.scaler.step(self.policy.critic_optimizer)
+        
+        # print("value is: ", values)
+        # print("value_preds_batch is: ", value_preds_batch)
+        # print("return_batch is: ", return_batch)
 
+        # print("*****************************************")
+        # print("cost_values is: ", cost_values)
+        # print("cost_preds_batch is: ", cost_preds_batch)
+        # print("cost_returns_batch is: ", cost_returns_batch)
         # Cost critic update
         cost_loss = self.cal_value_loss(cost_values, cost_preds_batch, cost_returns_batch, active_masks_batch)
         self.policy.cost_optimizer.zero_grad()
@@ -254,18 +308,21 @@ class GS_MAPPO():
 
         # Update Lagrangian coefficient
         if aver_episode_costs is not None:
-            delta_lamda_lagr = -(( aver_episode_costs.mean() - self.safety_bound) * (1 - self.gamma) + (imp_weights * cost_adv_targ)).mean().detach()
+            # delta_lamda_lagr = -(( cost_returns_batch.mean() - self.safety_bound) * (1 - self.gamma) + (imp_weights * cost_adv_targ)).mean().detach()
+            # delta_lamda_lagr = -(( aver_episode_costs.mean() - self.safety_bound) * (1 - self.gamma) + (imp_weights * cost_adv_targ)).mean().detach()
             # delta_lamda_lagr = -(( aver_episode_costs.mean() - self.safety_bound) + (imp_weights * cost_adv_targ)).mean().detach()
-            # delta_lamda_lagr = -(aver_episode_costs.mean() - self.safety_bound).mean().detach()
+            delta_lamda_lagr = -((aver_episode_costs.mean() - self.safety_bound)* (1 - self.gamma)).mean().detach()
             R_ReLU = torch.nn.ReLU()
             self.lamda_lagr = R_ReLU(self.lamda_lagr - (delta_lamda_lagr * self.lagrangian_coef))
+            self.lamda_lagr = torch.clamp(self.lamda_lagr, 0.0, 10.0)
 
-            # print("the average episode costs is: {}, the cost_adv_targ is: {}".format(aver_episode_costs.mean(), cost_adv_targ.mean()))
+            # print("the average episode costs is: {}, the cost_returns_batch is: {}".format(aver_episode_costs.mean(), cost_returns_batch.mean()))
+            # print("the value_adv_targ is: {}, the cost_adv_targ is: {}".format(adv_targ.mean(), cost_adv_targ.mean()))
 
         self.scaler.update()
 
         return (value_loss, critic_grad_norm, policy_loss, dist_entropy, 
-                actor_grad_norm, imp_weights, cost_loss, cost_grad_norm, aver_episode_costs, cost_adv_targ)
+                actor_grad_norm, imp_weights, cost_loss, cost_grad_norm, aver_episode_costs, cost_adv_targ, adv_targ)
 
     def train(self, 
             buffer: GSReplayBuffer, 
@@ -282,10 +339,12 @@ class GS_MAPPO():
         """
         if self._use_popart or self._use_valuenorm:
             advantages = buffer.returns[:-1] - self.value_normalizer.denormalize(buffer.value_preds[:-1])
-            cost_adv = buffer.cost_returns[:-1] - self.cost_normalizer.denormalize(buffer.cost_preds[:-1])
+            cost_adv = buffer.cost_returns[:-1] - self.value_normalizer.denormalize(buffer.cost_preds[:-1])
         else:
             advantages = buffer.returns[:-1] - buffer.value_preds[:-1]
-            cost_adv = buffer.cost_returns[:-1] - buffer.cost_preds[:-1]
+            cost_adv = buffer.cost_returns[:-1] - buffer.cost_preds[:-1]  # lower safer. negative is better
+
+        # cost_adv = buffer.cost_returns[:-1] - buffer.cost_preds[:-1]
 
         advantages_copy = advantages.copy()
         advantages_copy[buffer.active_masks[:-1] == 0.0] = np.nan
@@ -311,6 +370,7 @@ class GS_MAPPO():
         train_info['lamda_lagr'] = 0
         # train_info['avg_epi_costs'] = 0
         train_info['cost_adv_targ'] = 0
+        train_info['adv_targ'] = 0
 
         for _ in range(self.ppo_epoch):
             if self._use_recurrent_policy:
@@ -321,7 +381,7 @@ class GS_MAPPO():
                 data_generator = buffer.feed_forward_generator(advantages, self.num_mini_batch, mini_batch_size=self.data_chunks//self.num_mini_batch, cost_adv=cost_adv)
 
             for sample in data_generator:
-                value_loss, critic_grad_norm, policy_loss, dist_entropy, actor_grad_norm, imp_weights, cost_loss, cost_grad_norm, aver_episode_costs, cost_adv_targ = self.ppo_update(sample, update_actor)
+                value_loss, critic_grad_norm, policy_loss, dist_entropy, actor_grad_norm, imp_weights, cost_loss, cost_grad_norm, aver_episode_costs, cost_adv_targ, adv_targ = self.ppo_update(sample, update_actor)
 
                 train_info['value_loss'] += value_loss.item()
                 train_info['policy_loss'] += policy_loss.item()
@@ -334,6 +394,7 @@ class GS_MAPPO():
                 train_info['lamda_lagr'] += self.lamda_lagr.item()
                 # train_info['avg_epi_costs'] += aver_episode_costs.mean()
                 train_info['cost_adv_targ'] += cost_adv_targ.mean()
+                train_info['adv_targ'] += adv_targ.mean()
 
 
         num_updates = self.ppo_epoch * self.num_mini_batch

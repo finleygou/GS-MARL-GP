@@ -464,6 +464,7 @@ class GSReplayBuffer(object):
         else:
             if self._use_gae:
                 self.cost_preds[-1] = next_cost
+                # print("next_cost in buffer is: ", next_cost)  # DEBUG
                 gae = 0
                 for step in reversed(range(self.costs.shape[0])):
                     if self._use_popart or self._use_valuenorm:
@@ -481,6 +482,7 @@ class GSReplayBuffer(object):
                         self.cost_returns[step] = gae + value_normalizer.denormalize(
                             self.cost_preds[step]
                         )
+                        # print("cost_returns[{}] is: {}, vc-denorm:{}".format(step, self.cost_returns[step], value_normalizer.denormalize(self.cost_preds[step])))
                     else:
                         delta = (
                             self.costs[step]

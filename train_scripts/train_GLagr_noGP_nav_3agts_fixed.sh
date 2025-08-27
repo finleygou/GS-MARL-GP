@@ -20,7 +20,7 @@ CUDA_VISIBLE_DEVICES='2' python  ../onpolicy/scripts/train_mpe.py \
 --algorithm_name "rmappo" \
 --seed ${seed} \
 --experiment_name "check" \
---scenario_name "graph_navigation" \
+--scenario_name "graph_navigation_fix" \
 --max_edge_dist 1 \
 --clip_param 0.15 --gamma 0.99 \
 --hidden_size 64 --layer_N 2 \
@@ -38,7 +38,7 @@ CUDA_VISIBLE_DEVICES='2' python  ../onpolicy/scripts/train_mpe.py \
 --n_training_threads 16 --n_rollout_threads 32 \
 --use_lstm "True" \
 --episode_length ${ep_lens} \
---num_env_steps 5000000 \
+--num_env_steps 3000000 \
 --ppo_epoch 15 --use_ReLU --gain 0.01 --lr 2e-4 --critic_lr 2e-4 --cost_critic_lr 2e-4 \
 --user_name "finleygou" \
 --use_cent_obs "False" \

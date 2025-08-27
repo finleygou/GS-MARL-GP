@@ -35,7 +35,7 @@ CUDA_VISIBLE_DEVICES='3' python  ../onpolicy/scripts/train_mpe.py \
 --cost_value_loss_coef 1 --safety_bound 1.0 \
 --entropy_coef 0.01 --lagrangian_coef 0.005 --lamda_lagr 0.5 --lagrangian_coef_rate 5e-5 \
 --use_wandb "False" \
---n_training_threads 16 --n_rollout_threads 4 \
+--n_training_threads 16 --n_rollout_threads 1 \
 --use_lstm "True" \
 --episode_length ${ep_lens} \
 --num_env_steps 5000000 \
@@ -44,8 +44,8 @@ CUDA_VISIBLE_DEVICES='3' python  ../onpolicy/scripts/train_mpe.py \
 --use_cent_obs "False" \
 --graph_feat_type "relative" \
 --use_att_gnn "False" \
---split_batch "True" --max_batch_size 512 \
---auto_mini_batch_size "True" --target_mini_batch_size 512
+--split_batch "True" --max_batch_size 32 \
+--auto_mini_batch_size "True" --target_mini_batch_size 32
 done
 
 # &> $logs_folder/out_${ep_lens}_${seed} \

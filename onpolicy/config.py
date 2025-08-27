@@ -227,6 +227,7 @@ def get_config():
     # optimizer parameters
     parser.add_argument("--lr", type=float, default=5e-4, help="learning rate (default: 5e-4)")
     parser.add_argument("--critic_lr", type=float, default=5e-4, help="critic learning rate (default: 5e-4)")
+    parser.add_argument("--cost_critic_lr", type=float, default=5e-4, help="cost critic learning rate (default: 5e-4)") 
     parser.add_argument("--opti_eps", type=float, default=1e-5, help="RMSprop optimizer epsilon (default: 1e-5)")
     parser.add_argument("--weight_decay", type=float, default=0)
     parser.add_argument("--std_x_coef", type=float, default=1)  # tune diagonalGaussian std
@@ -254,8 +255,6 @@ def get_config():
     
     # safe MARL parameters
     parser.add_argument("--safety_bound", type=float, default=1, help="constraint upper bound")
-    parser.add_argument("--lagrangian_coef", type=float, default=0.01,
-                    help='entropy term coefficient (default: 0.01)')
     parser.add_argument("--lamda_lagr", type=float, default=0.8,
                     help='lagrangrian coef coefficient (default: 0.8)')
     parser.add_argument("--lagrangian_coef_rate", type=float, default=5e-4,

@@ -77,7 +77,7 @@ class GSMPERunner(Runner):
 
                 # Obs reward and next obs
                 obs, agent_id, node_obs, adj, rewards, costs, dones, infos = self.envs.step(actions_env)
-
+                # print("reward is {} costs is {}:".format(rewards, costs))  # DEBUG
                 data = (
                     obs,
                     agent_id,
@@ -209,6 +209,7 @@ class GSMPERunner(Runner):
             np.concatenate(self.buffer.masks[step]),
             np.concatenate(self.buffer.rnn_states_cost[step]),
         )
+        # print("cost_preds:", cost_preds)  # DEBUG
         # [self.envs, agents, dim]
         values = np.array(np.split(_t2n(value), self.n_rollout_threads))
         actions = np.array(np.split(_t2n(action), self.n_rollout_threads))
@@ -340,6 +341,7 @@ class GSMPERunner(Runner):
             np.concatenate(self.buffer.masks[-1]),
         )
         next_costs = np.array(np.split(_t2n(next_costs), self.n_rollout_threads))
+        # print("next_costs:", next_costs)  # DEBUG
 
         self.buffer.compute_returns(next_values, self.trainer.value_normalizer)
         self.buffer.compute_cost_returns(next_costs, self.trainer.value_normalizer)
@@ -542,6 +544,8 @@ class GSMPERunner(Runner):
                 episode_rewards.append(rewards)
                 episode_costs.append(costs)
 
+                # print("rewards is {} costs is {}".format(rewards, costs))  # DEBUG
+
                 rnn_states[dones == True] = np.zeros(
                     ((dones == True).sum(), self.recurrent_N, self.hidden_size),
                     dtype=np.float32,
@@ -575,8 +579,7 @@ class GSMPERunner(Runner):
             costs_arr.append(np.mean(np.sum(np.array(episode_costs), axis=0)))
 
             # print(np.mean(frac), success)
-            # print("Average episode rewards is: " +
-            # str(np.mean(np.sum(np.array(episode_rewards), axis=0))))
+            print("Average episode rewards is: {}, costs is: {}".format(rewards_arr[-1], costs_arr[-1]))
 
         # print(rewards_arr)
         # print(frac_episode_arr)
