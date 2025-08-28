@@ -17,13 +17,13 @@ do
     --algorithm_name "rmappo" \
     --seed ${seed} \
     --experiment_name "check" \
-    --scenario_name "graph_navigation_3agts" \
+    --scenario_name "graph_navigation_fix" \
     --hidden_size 64 \
     --layer_N 2 \
     --use_wandb "False" \
     --save_gifs "False" \
     --use_render "True" \
-    --save_data "False" \
+    --save_data "True" \
     --use_curriculum "False" \
     --use_policy "False" \
     --gp_type "navigation" \
@@ -40,6 +40,6 @@ do
     --graph_feat_type "relative" \
     --use_att_gnn "False" \
     --monte_carlo_test "False" \
-    --render_episodes 20 \
-    --model_dir "/data/goufandi_space/Projects/GS-MARL-GP/GS-MARL-GP/onpolicy/results/GSMPE/graph_navigation_3agts/rmappo/check/wandb/run-20250827_140701-lixooed4/files/"
+    --render_episodes 10 \
+    --model_dir "/data/goufandi_space/Projects/GS-MARL-GP/GS-MARL-GP/onpolicy/results/GSMPE/graph_navigation_fix/rmappo/check/wandb/run-20250826_165235-6spvqnw8/files/"
 done

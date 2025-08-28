@@ -249,7 +249,7 @@ class GS_MAPPO():
         )
 
         # Actor update with Lagrangian hybrid advantage
-        adv_targ_hybrid = adv_targ - self.lamda_lagr * cost_adv_targ
+        adv_targ_hybrid = adv_targ - self.lamda_lagr * cost_adv_targ*0.3
         # adv_targ_hybrid = adv_targ
         imp_weights = torch.exp(action_log_probs - old_action_log_probs_batch)
         surr1 = imp_weights * adv_targ_hybrid
@@ -314,7 +314,7 @@ class GS_MAPPO():
             delta_lamda_lagr = -((aver_episode_costs.mean() - self.safety_bound)* (1 - self.gamma)).mean().detach()
             R_ReLU = torch.nn.ReLU()
             self.lamda_lagr = R_ReLU(self.lamda_lagr - (delta_lamda_lagr * self.lagrangian_coef))
-            self.lamda_lagr = torch.clamp(self.lamda_lagr, 0.0, 10.0)
+            self.lamda_lagr = torch.clamp(self.lamda_lagr, 0.0, 1.0)
 
             # print("the average episode costs is: {}, the cost_returns_batch is: {}".format(aver_episode_costs.mean(), cost_returns_batch.mean()))
             # print("the value_adv_targ is: {}, the cost_adv_targ is: {}".format(adv_targ.mean(), cost_adv_targ.mean()))

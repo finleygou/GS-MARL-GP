@@ -13,14 +13,14 @@ do
 # seed=`expr ${seed} + 1`
 echo "seed: ${seed}"
 # execute the script with different params
-CUDA_VISIBLE_DEVICES='0' python  ../onpolicy/scripts/train_mpe.py \
+CUDA_VISIBLE_DEVICES='1' python  ../onpolicy/scripts/train_mpe.py \
 --use_valuenorm --use_popart \
 --project_name "GS_GP" \
 --env_name "GraphMPE" \
 --algorithm_name "rmappo" \
 --seed ${seed} \
 --experiment_name "check" \
---scenario_name "graph_navigation" \
+--scenario_name "graph_navigation_3agts" \
 --max_edge_dist 1 \
 --clip_param 0.15 --gamma 0.99 \
 --hidden_size 64 --layer_N 2 \
@@ -37,7 +37,7 @@ CUDA_VISIBLE_DEVICES='0' python  ../onpolicy/scripts/train_mpe.py \
 --use_lstm "True" \
 --episode_length ${ep_lens} \
 --num_env_steps 5000000 \
---ppo_epoch 15 --use_ReLU --gain 0.01 --lr 2e-4 --critic_lr 2e-4 \
+--ppo_epoch 15 --use_ReLU --gain 0.01 --lr 5e-4 --critic_lr 5e-4 \
 --user_name "finleygou" \
 --use_cent_obs "False" \
 --graph_feat_type "relative" \

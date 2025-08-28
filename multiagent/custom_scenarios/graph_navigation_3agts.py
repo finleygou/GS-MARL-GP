@@ -29,10 +29,6 @@ class Scenario(BaseScenario):
         self.cp = args.cp
         self.use_CL = args.use_curriculum
         self.num_egos = args.num_agents
-        if self.num_egos != 3:
-            raise ValueError("This scenario is only for 3 agents.")
-        else: 
-            from multiagent.random_scenarios.nav_3agt_scenarios import Scenarios
         self.num_target = args.num_target
         self.num_obs = args.num_obstacle
         self.num_dynamic_obs = args.num_dynamic_obs
@@ -167,7 +163,11 @@ class Scenario(BaseScenario):
         
         # Randomly select one of 10 scenarios
         sid = np.random.randint(0, 10)
-            
+        if self.num_egos == 3:
+            from multiagent.random_scenarios.nav_3agt_scenarios import Scenarios
+        else: 
+            raise ValueError("This scenario is only for 3 agents.")
+        
         scenario = Scenarios.data[sid]
         # Assign obstacles
         for i, (x, y) in enumerate(scenario['obstacles']):
@@ -363,7 +363,7 @@ class Scenario(BaseScenario):
             np.sum(np.square(agent.state.p_pos - goal.state.p_pos))
         )
         if dist_to_goal < agent.size/2:
-            rew += 20
+            rew += 15
         else:
             rew -= dist_to_goal
 

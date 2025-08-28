@@ -20,7 +20,7 @@ CUDA_VISIBLE_DEVICES='3' python  ../onpolicy/scripts/train_mpe.py \
 --algorithm_name "rmappo" \
 --seed ${seed} \
 --experiment_name "check" \
---scenario_name "graph_navigation" \
+--scenario_name "graph_navigation_3agts" \
 --max_edge_dist 1 \
 --clip_param 0.15 --gamma 0.99 \
 --hidden_size 64 --layer_N 2 \
