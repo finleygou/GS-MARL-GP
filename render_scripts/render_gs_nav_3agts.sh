@@ -18,7 +18,7 @@ do
     --seed ${seed} \
     --experiment_name "check" \
     --scenario_name "graph_navigation_3agts" \
-    --hidden_size 64 \
+    --hidden_size 128 \
     --layer_N 2 \
     --use_wandb "False" \
     --save_gifs "False" \
@@ -41,5 +41,5 @@ do
     --use_att_gnn "False" \
     --monte_carlo_test "False" \
     --render_episodes 20 \
-    --model_dir "/data/goufandi_space/Projects/GS-MARL-GP/GS-MARL-GP/onpolicy/results/GSMPE/graph_navigation_3agts/rmappo/check/wandb/run-20250827_140701-lixooed4/files/"
+    --model_dir "/data/goufandi_space/Projects/GS-MARL-GP/GS-MARL-GP/onpolicy/results/GSMPE/graph_navigation_3agts/rmappo/check/wandb/run-20250829_010835-uoom5k0g/files/"
 done

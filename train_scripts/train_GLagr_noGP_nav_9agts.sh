@@ -2,7 +2,7 @@
 
 # Run the script
 seed_max=1
-n_agents=3
+n_agents=6
 # graph_feat_types=("global" "global" "relative" "relative")
 # cent_obs=("True" "False" "True" "False")
 ep_lens=100
@@ -13,22 +13,22 @@ do
 # seed=`expr ${seed} + 1`
 echo "seed: ${seed}"
 # execute the script with different params
-CUDA_VISIBLE_DEVICES='1' python  ../onpolicy/scripts/train_mpe.py \
+CUDA_VISIBLE_DEVICES='3' python  ../onpolicy/scripts/train_mpe.py \
 --use_valuenorm --use_popart \
 --project_name "GS_GP" \
 --env_name "GSMPE" \
 --algorithm_name "rmappo" \
 --seed ${seed} \
 --experiment_name "check" \
---scenario_name "graph_navigation_3agts" \
+--scenario_name "graph_navigation_9agts" \
 --max_edge_dist 1 \
 --clip_param 0.2 --gamma 0.99 \
 --hidden_size 128 --layer_N 2 \
---num_target 3 --num_agents 3 --num_obstacle 3 --num_dynamic_obs 0 \
+--num_target 9 --num_agents 9 --num_obstacle 9 --num_dynamic_obs 0 \
 --gp_type "navigation" \
 --save_data "True" \
---reward_file_name "r_navigation_3agts_GL_noGP-v3" \
---cost_file_name "c_navigation_3agts_GL_noGP-v3" \
+--reward_file_name "r_navigation_9agts_GL_noGP-v1" \
+--cost_file_name "c_navigation_9agts_GL_noGP-v1" \
 --use_policy "False" \
 --use_curriculum "False" \
 --guide_cp 0.4 --cp 0.4 --js_ratio 0.0 \
