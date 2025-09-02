@@ -59,13 +59,17 @@ class Scenario(BaseScenario):
         world.dynamic_obstacles = [DynamicObstacle() for i in range(self.num_dynamic_obs)]
         world.agents = world.egos + world.dynamic_obstacles  # cannot add targets here, which is static
         
+        color_list = [np.array([0.95, 0.45, 0.45]), np.array([0.95, 0.95, 0.00]), 
+                np.array([0.45, 0.95, 0.45]), np.array([0.95, 0.75, 0.80]),
+                np.array([0.45, 0.0, 0.45]), np.array([0.6, 0.4, 0.2])]
         # add agents
         global_id = 0
         for i, ego in enumerate(world.egos):
             ego.id = i
             ego.size = 0.1
             ego.R = ego.size
-            ego.color = np.array([0.95, 0.45, 0.45])
+            # ego.color = np.array([0.95, 0.45, 0.45])
+            ego.color = color_list[i]
             ego.max_speed = 2.0
             ego.max_accel = 2.0
             ego.delta = 0
@@ -76,7 +80,8 @@ class Scenario(BaseScenario):
             target.id = i
             target.size = 0.1
             target.R = target.size
-            target.color = np.array([0.95, 0.95, 0.00])
+            # target.color = np.array([0.95, 0.95, 0.00])
+            target.color = color_list[i]
             target.max_speed = 0
             target.max_accel = 0
             target.global_id = global_id
@@ -107,7 +112,8 @@ class Scenario(BaseScenario):
         world.num_agent_collisions = np.zeros(self.num_egos)
 
         # Randomly select one of 10 scenarios
-        sid = np.random.randint(0, 5)
+        # sid = np.random.randint(0, 5)
+        sid = 0
         if self.num_egos == 6:
             from multiagent.random_scenarios.nav_6agt_scenarios import Scenarios
         else: 
@@ -116,11 +122,13 @@ class Scenario(BaseScenario):
         scenario = Scenarios.data[sid]
         # Assign obstacles
         for i, (x, y) in enumerate(scenario['obstacles']):
-            world.obstacles[i].state.p_pos = np.array([x, y])
+            init_pos_ego = np.array([x, y])
+            world.obstacles[i].state.p_pos = init_pos_ego+np.random.randn(*init_pos_ego.shape)*0.02
             world.obstacles[i].state.p_vel = np.zeros(world.dim_p)
 
         # Assign egos
         for i, (x, y) in enumerate(scenario['egos']):
+            world.egos[i].done = False
             world.egos[i].state.p_pos = np.array([x, y])
             world.egos[i].state.p_vel = np.zeros(world.dim_p)
             # Goal is target position (assuming targets correspond to egos by index)
@@ -286,7 +294,7 @@ class Scenario(BaseScenario):
         # dynamic_obstacles = world.dynamic_obstacles
         
         rew = 0
-        penalty = 2
+        penalty = 5
         # collision_flag = False
         for ego in egos:
             if ego == agent: pass
@@ -308,9 +316,10 @@ class Scenario(BaseScenario):
             np.sum(np.square(agent.state.p_pos - goal.state.p_pos))
         )
         if dist_to_goal < agent.size/2:
-            rew += 15
+            rew += 10
+            agent.done = True
         else:
-            rew -= dist_to_goal
+            rew += np.exp(-0.5*dist_to_goal)
 
         # agent.done = self.done(agent, world)
         # print("step:", world.world_step)

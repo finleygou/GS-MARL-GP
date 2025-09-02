@@ -80,6 +80,7 @@ class GS_MAPPO():
         self.lagrangian_coef = args.lagrangian_coef_rate
         self.lamda_lagr = args.lamda_lagr
         self.safety_bound = args.safety_bound
+        self.lamda_scale = args.lamda_scale
 
         # Value and cost normalizers
         if self._use_popart:
@@ -249,7 +250,7 @@ class GS_MAPPO():
         )
 
         # Actor update with Lagrangian hybrid advantage
-        adv_targ_hybrid = adv_targ - self.lamda_lagr * cost_adv_targ*0.3
+        adv_targ_hybrid = adv_targ - self.lamda_lagr * cost_adv_targ* self.lamda_scale
         # adv_targ_hybrid = adv_targ
         imp_weights = torch.exp(action_log_probs - old_action_log_probs_batch)
         surr1 = imp_weights * adv_targ_hybrid

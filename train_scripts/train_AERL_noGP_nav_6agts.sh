@@ -5,7 +5,7 @@ seed_max=1
 n_agents=6
 # graph_feat_types=("global" "global" "relative" "relative")
 # cent_obs=("True" "False" "True" "False")
-ep_lens=150
+ep_lens=100
 export WANDB_BASE_URL=https://api.bandw.top
 
 for seed in `seq ${seed_max}`;
@@ -13,7 +13,7 @@ do
 # seed=`expr ${seed} + 1`
 echo "seed: ${seed}"
 # execute the script with different params
-CUDA_VISIBLE_DEVICES='3' python  ../onpolicy/scripts/train_mpe.py \
+CUDA_VISIBLE_DEVICES='2' python  ../onpolicy/scripts/train_mpe.py \
 --use_valuenorm --use_popart \
 --project_name "GS_GP" \
 --env_name "GSMPE" \
@@ -27,13 +27,13 @@ CUDA_VISIBLE_DEVICES='3' python  ../onpolicy/scripts/train_mpe.py \
 --num_target 6 --num_agents 6 --num_obstacle 6 --num_dynamic_obs 0 \
 --gp_type "navigation" \
 --save_data "True" \
---reward_file_name "r_navigation_6agts_GL_noGP-v2" \
---cost_file_name "c_navigation_6agts_GL_noGP-v2" \
+--reward_file_name "r_navigation_6agts_GL_noGP-v1" \
+--cost_file_name "c_navigation_6agts_GL_noGP-v1" \
 --use_policy "False" \
 --use_curriculum "False" \
 --guide_cp 0.4 --cp 0.4 --js_ratio 0.0 \
 --entropy_coef 0.01 --cost_value_loss_coef 1 --safety_bound 3.0 \
---lamda_lagr 0.01 --lagrangian_coef_rate 5e-5 --lamda_scale 0.3 \
+--lamda_lagr 0.01 --lagrangian_coef_rate 1e-4 \
 --use_wandb "True" \
 --n_training_threads 16 --n_rollout_threads 32 \
 --use_lstm "True" \

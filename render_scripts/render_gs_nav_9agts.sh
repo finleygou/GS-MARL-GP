@@ -2,7 +2,7 @@
 set -e
 # Run the script
 seed_max=1
-n_agents=3
+n_agents=9
 ep_lens=100
 use_curriculum="False"
 
@@ -13,11 +13,11 @@ do
     python ../onpolicy/scripts/eval_mpe.py \
     --use_valuenorm --use_popart \
     --project_name "GS_GP" \
-    --env_name "GSMPE" \
+    --env_name "GraphMPE" \
     --algorithm_name "rmappo" \
     --seed ${seed} \
     --experiment_name "check" \
-    --scenario_name "graph_navigation_3agts" \
+    --scenario_name "graph_navigation_9agts" \
     --hidden_size 128 \
     --layer_N 2 \
     --use_wandb "False" \
@@ -27,9 +27,9 @@ do
     --use_curriculum "False" \
     --use_policy "False" \
     --gp_type "navigation" \
-    --num_target 3 \
-    --num_agents 3 \
-    --num_obstacle 3 \
+    --num_target 9 \
+    --num_agents 9 \
+    --num_obstacle 9 \
     --num_dynamic_obs 0 \
     --n_rollout_threads 1 \
     --use_lstm "True" \
@@ -41,5 +41,5 @@ do
     --use_att_gnn "False" \
     --monte_carlo_test "False" \
     --render_episodes 20 \
-    --model_dir "/data/goufandi_space/Projects/GS-MARL-GP/GS-MARL-GP/onpolicy/results/GSMPE/graph_navigation_3agts/rmappo/check/wandb/run-20250829_010930-460xj03o/files/"
+    --model_dir "/data/goufandi_space/Projects/GS-MARL-GP/GS-MARL-GP/onpolicy/results/GraphMPE/graph_navigation_9agts/rmappo/check/wandb/run-20250830_222755-x1ewvlhn/files/"
 done

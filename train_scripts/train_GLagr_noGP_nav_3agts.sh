@@ -27,13 +27,13 @@ CUDA_VISIBLE_DEVICES='1' python  ../onpolicy/scripts/train_mpe.py \
 --num_target 3 --num_agents 3 --num_obstacle 3 --num_dynamic_obs 0 \
 --gp_type "navigation" \
 --save_data "True" \
---reward_file_name "r_navigation_3agts_GL_noGP-v3" \
---cost_file_name "c_navigation_3agts_GL_noGP-v3" \
+--reward_file_name "r_navigation_3agts_GL_noGP-v4" \
+--cost_file_name "c_navigation_3agts_GL_noGP-v4" \
 --use_policy "False" \
 --use_curriculum "False" \
 --guide_cp 0.4 --cp 0.4 --js_ratio 0.0 \
 --entropy_coef 0.01 --cost_value_loss_coef 1 --safety_bound 3.0 \
---lamda_lagr 0.01 --lagrangian_coef_rate 1e-4 \
+--lamda_lagr 0.01 --lagrangian_coef_rate 1e-4 --lamda_scale 0.3\
 --use_wandb "True" \
 --n_training_threads 16 --n_rollout_threads 32 \
 --use_lstm "True" \

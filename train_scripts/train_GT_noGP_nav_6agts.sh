@@ -5,7 +5,7 @@ seed_max=1
 n_agents=6
 # graph_feat_types=("global" "global" "relative" "relative")
 # cent_obs=("True" "False" "True" "False")
-ep_lens=100
+ep_lens=150
 export WANDB_BASE_URL=https://api.bandw.top
 
 for seed in `seq ${seed_max}`;
@@ -20,15 +20,15 @@ CUDA_VISIBLE_DEVICES='1' python  ../onpolicy/scripts/train_mpe.py \
 --algorithm_name "rmappo" \
 --seed ${seed} \
 --experiment_name "check" \
---scenario_name "graph_navigation" \
+--scenario_name "graph_navigation_6agts" \
 --max_edge_dist 1 \
---clip_param 0.15 --gamma 0.99 \
---hidden_size 64 --layer_N 1 \
+--clip_param 0.2 --gamma 0.99 \
+--hidden_size 128 --layer_N 2 \
 --num_target 6 --num_agents 6 --num_obstacle 6 --num_dynamic_obs 0 \
 --gp_type "navigation" \
 --save_data "True" \
---reward_file_name "r_navigation_6agts_GT_noGP" \
---cost_file_name "c_navigation_6agts_GT_noGP" \
+--reward_file_name "r_navigation_6agts_GT_noGP-v2" \
+--cost_file_name "c_navigation_6agts_GT_noGP-v2" \
 --use_policy "False" \
 --use_curriculum "False" \
 --guide_cp 0.4 --cp 0.4 --js_ratio 0.0 \

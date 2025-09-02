@@ -259,6 +259,7 @@ def get_config():
                     help='lagrangrian coef coefficient (default: 0.8)')
     parser.add_argument("--lagrangian_coef_rate", type=float, default=5e-4,
                         help='lagrangrian coef learning rate (default: 5e-4)')
+    parser.add_argument("--lamda_scale", type=float, default=0.3, help="ratio for cost_adv_tar")
 
     # curriculum learning parameters
     parser.add_argument("--use_policy", type=lambda x: bool(strtobool(x)), default=False, help="use the fixed policy to conduct tasks")
@@ -269,7 +270,7 @@ def get_config():
 
     # run parameters
     parser.add_argument("--use_linear_lr_decay", action="store_true", default=False, help="use a linear schedule on the learning rate")
-    parser.add_argument("--use_train_render", default=False, help='render environment while training')
+    parser.add_argument("--use_train_render", type=lambda x: bool(strtobool(x)), default=False, help='render environment while training')
     parser.add_argument("--no_imageshow", default=False, help='do not show the image whle rendering, provide convenience for monte carlo test.')
     
     # save parameters

@@ -198,6 +198,8 @@ class Runner(object):
         torch.save(policy_actor.state_dict(), str(self.save_dir) + "/actor.pt")
         policy_critic = self.trainer.policy.critic
         torch.save(policy_critic.state_dict(), str(self.save_dir) + "/critic.pt")
+        policy_cost_critic = self.trainer.policy.cost_critic
+        torch.save(policy_cost_critic.state_dict(), str(self.save_dir) + "/cost_critic.pt")
 
     def restore(self):
         """Restore policy's networks from a saved model."""
@@ -210,6 +212,11 @@ class Runner(object):
                 str(self.model_dir) + "/critic.pt", map_location=torch.device("cpu")
             )
             self.policy.critic.load_state_dict(policy_critic_state_dict)
+
+            policy_cost_critic_state_dict = torch.load(
+                str(self.model_dir) + "/cost_critic.pt", map_location=torch.device("cpu")
+            )
+            self.policy.cost_critic.load_state_dict(policy_cost_critic_state_dict)
 
         # 保存完整的模型，包括结构和参数
         # torch.save(self.policy.actor, str(self.model_dir) + "/actor_structure.pt")

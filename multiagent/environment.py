@@ -270,6 +270,8 @@ class MultiAgentBaseEnv(gym.Env):
                     acc = -agent.state.p_vel/target_v*agent.max_accel*1.1
                 network_output[0], network_output[1] = acc[0], acc[1]
                 policy_output = network_output
+                agent.state.p_vel = np.array([0,0])
+                # print("agent done, decellerate to zero")
 
             if self.use_CL == True:
                 if self.CL_ratio < self.Cp:
@@ -535,20 +537,20 @@ class MultiAgentBaseEnv(gym.Env):
                         self.line[m+k].set_color(*agent.color, alpha=0.5)
 
                 # render the graph connections
-                if hasattr(self.world, "graph_mode"):
-                    if self.world.graph_mode:
-                        edge_list = self.world.edge_list.T
-                        assert edge_list is not None, "Edge list should not be None"
-                        for entity1 in self.world.entities:
-                            for entity2 in self.world.entities:
-                                e1_id, e2_id = entity1.global_id, entity2.global_id
-                                if e1_id == e2_id:
-                                    continue
-                                # if edge exists draw a line
-                                if [e1_id, e2_id] in edge_list.tolist():
-                                    src = entity1.state.p_pos
-                                    dest = entity2.state.p_pos
-                                    self.viewers[i].draw_line(start=src, end=dest)
+                # if hasattr(self.world, "graph_mode"):
+                #     if self.world.graph_mode:
+                #         edge_list = self.world.edge_list.T
+                #         assert edge_list is not None, "Edge list should not be None"
+                #         for entity1 in self.world.entities:
+                #             for entity2 in self.world.entities:
+                #                 e1_id, e2_id = entity1.global_id, entity2.global_id
+                #                 if e1_id == e2_id:
+                #                     continue
+                #                 # if edge exists draw a line
+                #                 if [e1_id, e2_id] in edge_list.tolist():
+                #                     src = entity1.state.p_pos
+                #                     dest = entity2.state.p_pos
+                #                     self.viewers[i].draw_line(start=src, end=dest)
 
                 # render to display or array
                 results.append(self.viewers[i].render(return_rgb_array=mode == "rgb_array"))

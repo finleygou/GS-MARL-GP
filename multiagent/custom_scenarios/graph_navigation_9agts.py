@@ -107,7 +107,8 @@ class Scenario(BaseScenario):
         world.num_agent_collisions = np.zeros(self.num_egos)
 
         # Randomly select one of 10 scenarios
-        sid = np.random.randint(0, 5)
+        # sid = np.random.randint(0, 5)
+        sid = 0
         if self.num_egos == 9:
             from multiagent.random_scenarios.nav_9agt_scenarios import Scenarios
         else: 
@@ -121,6 +122,7 @@ class Scenario(BaseScenario):
 
         # Assign egos
         for i, (x, y) in enumerate(scenario['egos']):
+            world.egos[i].done = False
             world.egos[i].state.p_pos = np.array([x, y])
             world.egos[i].state.p_vel = np.zeros(world.dim_p)
             # Goal is target position (assuming targets correspond to egos by index)
@@ -286,7 +288,7 @@ class Scenario(BaseScenario):
         # dynamic_obstacles = world.dynamic_obstacles
         
         rew = 0
-        penalty = 2
+        penalty = 3
         # collision_flag = False
         for ego in egos:
             if ego == agent: pass
@@ -308,7 +310,8 @@ class Scenario(BaseScenario):
             np.sum(np.square(agent.state.p_pos - goal.state.p_pos))
         )
         if dist_to_goal < agent.size/2:
-            rew += 15
+            rew += 30
+            agent.done=True
         else:
             rew -= dist_to_goal
 

@@ -58,10 +58,15 @@ class GMPERunner(Runner):
             if self.use_linear_lr_decay:
                 self.trainer.policy.lr_decay(episode, episodes)
 
+            if self.use_train_render == True:
+                image = self.envs.render('rgb_array')[0][0]
+
             CL_ratio = episode/episodes
             glv.set_value('CL_ratio', CL_ratio)  #curriculum learning
             self.envs.set_CL(glv.get_value('CL_ratio'))  # env_wrapper
             for step in range(self.episode_length):
+                calc_start = time.time()
+
                 # print("step:", step)
                 # Sample actions
                 (
@@ -94,6 +99,14 @@ class GMPERunner(Runner):
                     rnn_states,
                     rnn_states_critic,
                 )
+
+                # render while training
+                if self.use_train_render == True:
+                    image = self.envs.render('rgb_array')[0][0]
+                    calc_end = time.time()
+                    elapsed = calc_end - calc_start
+                    if elapsed < self.all_args.ifi:
+                        time.sleep(self.all_args.ifi - elapsed)
 
                 # insert data into buffer
                 self.insert(data)
@@ -531,6 +544,7 @@ class GMPERunner(Runner):
             # print(np.mean(frac), success)
             # print("Average episode rewards is: " +
             # str(np.mean(np.sum(np.array(episode_rewards), axis=0))))
+            print("Average episode rewards is: {}, costs is: {}".format(rewards_arr[-1], costs_arr[-1]))
 
         # print(rewards_arr)
         # print(frac_episode_arr)
