@@ -54,12 +54,6 @@ def make_render_env(all_args: argparse.Namespace):
 
 def parse_args(args, parser):
     parser.add_argument(
-        "--collaborative",
-        type=lambda x: bool(strtobool(x)),
-        default=True,
-        help="Number of agents in the env",
-    )
-    parser.add_argument(
         "--max_speed",
         type=float,
         default=2,

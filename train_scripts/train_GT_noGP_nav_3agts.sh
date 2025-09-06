@@ -36,8 +36,8 @@ CUDA_VISIBLE_DEVICES='0' python  ../onpolicy/scripts/train_mpe.py \
 --n_training_threads 16 --n_rollout_threads 32 \
 --use_lstm "True" \
 --episode_length ${ep_lens} \
---num_env_steps 6000000 \
---ppo_epoch 15 --use_ReLU --gain 0.01 --lr 2e-4 --critic_lr 2e-4 \
+--num_env_steps 3000000 \
+--ppo_epoch 15 --use_ReLU --gain 0.01 --lr 1e-4 --critic_lr 1e-4 \
 --user_name "finleygou" \
 --use_cent_obs "False" \
 --graph_feat_type "relative" \

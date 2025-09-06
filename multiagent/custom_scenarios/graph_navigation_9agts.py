@@ -20,8 +20,8 @@ class Scenario(BaseScenario):
 
     def __init__(self) -> None:
         super().__init__()
-        self.band_init = 0.1/2
-        self.band_target = 0.1/2
+        self.band_init = 0.1
+        self.band_target = 0.1
         self.d_lft_band = self.band_target
 
     def make_world(self, args: argparse.Namespace) -> World:
@@ -49,7 +49,7 @@ class Scenario(BaseScenario):
         world.graph_mode = True
         world.graph_feat_type = args.graph_feat_type
         world.world_length = args.episode_length
-        world.collaborative = True
+        world.collaborative = False
         self.world_size = np.sqrt(16*args.num_agents/3)
 
         world.max_edge_dist = self.max_edge_dist
@@ -66,8 +66,8 @@ class Scenario(BaseScenario):
             ego.size = 0.1
             ego.R = ego.size
             ego.color = np.array([0.95, 0.45, 0.45])
-            ego.max_speed = 2.0
-            ego.max_accel = 2.0
+            ego.max_speed = 1.0
+            ego.max_accel = 0.5
             ego.delta = 0
             ego.global_id = global_id
             global_id += 1
@@ -107,8 +107,8 @@ class Scenario(BaseScenario):
         world.num_agent_collisions = np.zeros(self.num_egos)
 
         # Randomly select one of 10 scenarios
-        # sid = np.random.randint(0, 5)
-        sid = 0
+        sid = np.random.randint(0, 5)
+        # sid = 0
         if self.num_egos == 9:
             from multiagent.random_scenarios.nav_9agt_scenarios import Scenarios
         else: 
@@ -123,7 +123,8 @@ class Scenario(BaseScenario):
         # Assign egos
         for i, (x, y) in enumerate(scenario['egos']):
             world.egos[i].done = False
-            world.egos[i].state.p_pos = np.array([x, y])
+            init_pos_ego = np.array([x, y])
+            world.egos[i].state.p_pos = init_pos_ego+np.random.randn(*init_pos_ego.shape)*0.01
             world.egos[i].state.p_vel = np.zeros(world.dim_p)
             # Goal is target position (assuming targets correspond to egos by index)
             tx, ty = scenario['targets'][i]
@@ -288,7 +289,7 @@ class Scenario(BaseScenario):
         # dynamic_obstacles = world.dynamic_obstacles
         
         rew = 0
-        penalty = 3
+        penalty = 5
         # collision_flag = False
         for ego in egos:
             if ego == agent: pass
@@ -309,11 +310,11 @@ class Scenario(BaseScenario):
         dist_to_goal = np.sqrt(
             np.sum(np.square(agent.state.p_pos - goal.state.p_pos))
         )
-        if dist_to_goal < agent.size/2:
-            rew += 30
-            agent.done=True
+        if dist_to_goal < self.band_target:
+            rew += 10
+            agent.done = True
         else:
-            rew -= dist_to_goal
+            rew += 5*(np.exp(-0.2*dist_to_goal)-1)
 
         # agent.done = self.done(agent, world)
         # print("step:", world.world_step)
@@ -402,7 +403,7 @@ class Scenario(BaseScenario):
         else:
             raise ValueError(f"{entity.name} not supported")
 
-        return np.hstack([pos, vel, entity_type])
+        return np.hstack([pos, vel, Radius, entity_type])
 
     def _get_entity_feat_relative(self, agent: Agent, entity: Entity, world: World) -> arr:
         """
@@ -425,7 +426,7 @@ class Scenario(BaseScenario):
         else:
             raise ValueError(f"{entity.name} not supported")
 
-        return np.hstack([pos, vel, entity_type])  # dim = 5
+        return np.hstack([pos, vel, Radius, entity_type])  # dim = 6
 
 def dobs_policy(agent, obstacles, dobs):
     action = agent.action

@@ -302,7 +302,7 @@ def get_config():
     parser.add_argument("--verbose", action="store_false", default=True, help="by default, print args and network at the beginning.")
 
     # scenario settings
-    parser.add_argument("--max_edge_dist", type=float, default=1.5, help="Maximum distance above which edges cannot be connected between the entities")
+    parser.add_argument("--max_edge_dist", type=float, default=1.0, help="Maximum distance above which edges cannot be connected between the entities")
     parser.add_argument("--num_target", type=int, default=0, help="the number of targets")
     parser.add_argument("--num_obstacle", type=int, default=4, help="the number of obstacles")
     parser.add_argument("--num_dynamic_obs", type=int, default=4, help="the number of dynamic obstacles")

@@ -23,8 +23,8 @@ class Scenario(BaseScenario):
 
     def __init__(self) -> None:
         super().__init__()
-        self.band_init = 0.1/3
-        self.band_target = 0.1/3
+        self.band_init = 0.1
+        self.band_target = 0.1
         self.d_lft_band = self.band_target
 
     def make_world(self, args: argparse.Namespace) -> World:
@@ -119,6 +119,7 @@ class Scenario(BaseScenario):
 
         goal_pos = np.array([[1., 2.], [0., 2.0], [-1., 2.]])
         init_pos_ego = np.array([[-1., 0.], [0.0, 0.0], [1., 0.0]])
+        init_pos_ego = init_pos_ego + np.random.randn(*init_pos_ego.shape)*0.01
         for i, ego in enumerate(world.egos):
             ego.done = False
             ego.state.p_pos = init_pos_ego[i]
@@ -318,8 +319,9 @@ class Scenario(BaseScenario):
         dist_to_goal = np.sqrt(
             np.sum(np.square(agent.state.p_pos - goal.state.p_pos))
         )
-        if dist_to_goal < agent.size/3:
+        if dist_to_goal < agent.size:
             rew += 10
+            agent.done = True
         else:
             rew -= dist_to_goal
 

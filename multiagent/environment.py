@@ -267,10 +267,11 @@ class MultiAgentBaseEnv(gym.Env):
                 if target_v < 1e-3:
                     acc = np.array([0,0])
                 else:
-                    acc = -agent.state.p_vel/target_v*agent.max_accel*1.1
+                    acc = -agent.state.p_vel/target_v*agent.max_accel
                 network_output[0], network_output[1] = acc[0], acc[1]
                 policy_output = network_output
-                agent.state.p_vel = np.array([0,0])
+                agent.state.p_vel = agent.state.p_vel * 1/2
+                # agent.state.p_vel = np.array([0,0])
                 # print("agent done, decellerate to zero")
 
             if self.use_CL == True:

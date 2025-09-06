@@ -41,5 +41,5 @@ do
     --use_att_gnn "False" \
     --monte_carlo_test "False" \
     --render_episodes 20 \
-    --model_dir "/data/goufandi_space/Projects/GS-MARL-GP/GS-MARL-GP/onpolicy/results/GraphMPE/graph_navigation_9agts/rmappo/check/wandb/run-20250830_222755-x1ewvlhn/files/"
+    --model_dir "/data/goufandi_space/Projects/GS-MARL-GP/GS-MARL-GP/onpolicy/results/GSMPE/graph_navigation_9agts/rmappo/check/wandb/run-20250903_150056-gn58608v/files/"
 done

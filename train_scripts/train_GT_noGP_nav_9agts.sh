@@ -13,7 +13,7 @@ do
 # seed=`expr ${seed} + 1`
 echo "seed: ${seed}"
 # execute the script with different params
-CUDA_VISIBLE_DEVICES='3' python  ../onpolicy/scripts/train_mpe.py \
+CUDA_VISIBLE_DEVICES='2' python  ../onpolicy/scripts/train_mpe.py \
 --use_valuenorm --use_popart \
 --project_name "GS_GP" \
 --env_name "GraphMPE" \
@@ -27,8 +27,8 @@ CUDA_VISIBLE_DEVICES='3' python  ../onpolicy/scripts/train_mpe.py \
 --num_target 9 --num_agents 9 --num_obstacle 9 --num_dynamic_obs 0 \
 --gp_type "navigation" \
 --save_data "True" \
---reward_file_name "r_navigation_9agts_GT_noGP-v4" \
---cost_file_name "c_navigation_9agts_GT_noGP-v4" \
+--reward_file_name "r_navigation_9agts_GT_noGP-v1" \
+--cost_file_name "c_navigation_9agts_GT_noGP-v1" \
 --use_policy "False" \
 --use_curriculum "False" \
 --guide_cp 0.4 --cp 0.4 --js_ratio 0.0 \
@@ -36,8 +36,8 @@ CUDA_VISIBLE_DEVICES='3' python  ../onpolicy/scripts/train_mpe.py \
 --n_training_threads 16 --n_rollout_threads 32 \
 --use_lstm "True" \
 --episode_length ${ep_lens} \
---num_env_steps 6000000 \
---ppo_epoch 15 --use_ReLU --gain 0.01 --lr 5e-4 --critic_lr 5e-4 \
+--num_env_steps 3000000 \
+--ppo_epoch 15 --use_ReLU --gain 0.01 --lr 1e-4 --critic_lr 1e-4 \
 --user_name "finleygou" \
 --use_cent_obs "False" \
 --graph_feat_type "relative" \
