@@ -207,7 +207,8 @@ def main(args):
         from multiagent.environment import INFO
         #csv
         # print("INFO", INFO)
-        file = open('INFO.csv', 'w', encoding='utf-8', newline="")
+        file_name = all_args.render_file_name
+        file = open(file_name+'.csv', 'w', encoding='utf-8', newline="")
         writer = csv.writer(file)
         # writer.writerow(['id', 'pos_x', 'pos_y', 'vel', 'phi'])
         for data in INFO:

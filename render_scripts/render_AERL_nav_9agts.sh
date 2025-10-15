@@ -2,9 +2,8 @@
 set -e
 # Run the script
 seed_max=1
-n_agents=5
-ep_lens=200
-save_gifs="False"
+n_agents=9
+ep_lens=100
 use_curriculum="False"
 
 for seed in $(seq ${seed_max});
@@ -12,36 +11,35 @@ do
     echo "seed: ${seed}"
     # execute the script with different params
     python ../onpolicy/scripts/eval_mpe.py \
-    --use_valuenorm --use_popart \
-    --project_name "GP_Graph" \
+    --project_name "GS_GP" \
     --env_name "GraphMPE" \
     --algorithm_name "rmappo" \
     --seed ${seed} \
     --experiment_name "check" \
-    --scenario_name "graph_encirclement_5agts_tune" \
-    --max_edge_dist 1.8 \
-    --hidden_size 64 \
-    --layer_N 1 \
+    --scenario_name "graph_navigation_9agts" \
+    --hidden_size 128 \
+    --layer_N 2 \
     --use_wandb "False" \
     --save_gifs "False" \
     --use_render "True" \
     --save_data "True" \
     --use_curriculum "False" \
     --use_policy "False" \
-    --gp_type "encirclement" \
-    --num_target 1 \
-    --num_agents 5 \
-    --num_obstacle 4 \
-    --num_dynamic_obs 4 \
+    --gp_type "navigation" \
+    --render_file_name "9agt-AERL" \
+    --num_target 9 \
+    --num_agents 9 \
+    --num_obstacle 9 \
+    --num_dynamic_obs 0 \
     --n_rollout_threads 1 \
     --use_lstm "True" \
     --episode_length ${ep_lens} \
-    --ppo_epoch 15 --use_ReLU --gain 0.01 \
+    --use_ReLU --gain 0.01 \
     --user_name "finleygou" \
     --use_cent_obs "False" \
     --graph_feat_type "relative" \
-    --use_att_gnn "False" \
+    --use_att_gnn "True" \
     --monte_carlo_test "True" \
     --render_episodes 100 \
-    --model_dir "/data/goufandi_space/Projects/InforMARL/onpolicy/results/GraphMPE/graph_encirclement_5agts_tune/rmappo/check/wandb/run-20241024_114228-vuqrvrsw/files/"
+    --model_dir "/data/goufandi_space/Projects/GS-MARL-GP/GS-MARL-GP/onpolicy/results/GraphMPE/graph_navigation_9agts/rmappo/check/wandb/run-20250904_151830-l4yremhh/files/"
 done

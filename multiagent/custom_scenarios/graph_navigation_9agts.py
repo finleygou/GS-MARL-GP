@@ -108,7 +108,7 @@ class Scenario(BaseScenario):
 
         # Randomly select one of 10 scenarios
         sid = np.random.randint(0, 5)
-        # sid = 0
+        sid = 2
         if self.num_egos == 9:
             from multiagent.random_scenarios.nav_9agt_scenarios import Scenarios
         else: 

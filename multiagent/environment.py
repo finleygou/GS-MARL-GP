@@ -47,6 +47,12 @@ class MultiAgentBaseEnv(gym.Env):
         self.Cp = args.guide_cp
         self.js_ratio = args.js_ratio
         self.JS_thre = 0  # step of guide steps
+        # set required vectorized gym env property
+        self.n = len(world.policy_agents)
+        self.num_agents = len(
+            world.policy_agents
+        )  # for compatibility with offpolicy baseline envs
+        # scenario callbacks
 
         # terminate
         self.is_terminate = False
@@ -59,8 +65,8 @@ class MultiAgentBaseEnv(gym.Env):
         self.data_ = ()
         self.INFO_flag = 0
         self.collision_num = 0
-        self.reward_all = 0 # for data record
-        self.cost_all = 0 # for data record
+        self.reward_all = np.array([0]*self.n) # for data record
+        self.cost_all = np.array([0]*self.n) # for data record
         if self.args.gp_type == 'formation':
             self.formation_error = 0
         elif self.args.gp_type == 'encirclement':
@@ -72,12 +78,7 @@ class MultiAgentBaseEnv(gym.Env):
         self.current_step = 0
         self.agents = self.world.policy_agents
 
-        # set required vectorized gym env property
-        self.n = len(world.policy_agents)
-        self.num_agents = len(
-            world.policy_agents
-        )  # for compatibility with offpolicy baseline envs
-        # scenario callbacks
+
         self.reset_callback = reset_callback
         self.reward_callback = reward_callback
         self.cost_callback = cost_callback
@@ -303,42 +304,46 @@ class MultiAgentBaseEnv(gym.Env):
     def render(self, mode: str = "human", close: bool = False) -> List:
         if self.monte_carlo_test:
             # print(self.current_step)
-            if self.current_step == self.world_length-1 and self.INFO_flag == 0:
-                self.data_ = self.data_ + (self.round, int(self.is_terminate), self.current_step,)
-                if self.args.gp_type == 'encirclement':
-                    self.data_ = self.data_ + (self.angle_error/self.n, self.dist_error/self.n, )
-                # INFO.append(data_)  # 增加行
-                # print("round:{} current_step:{} is_terminate:{}".format(self.round, self.current_step, self.is_terminate))
-                self.INFO_flag = 1
-                self.round += 1
-            elif self.is_terminate == True and self.INFO_flag == 0:
-                self.data_ = self.data_ + (self.round, int(self.is_terminate), self.current_step,)
-                if self.args.gp_type == 'encirclement':
-                    self.data_ = self.data_ + (self.angle_error/self.n, self.dist_error/self.n, )
-                # INFO.append(data_)  # 增加行
-                # print("round:{} current_step:{} is_terminate:{}".format(self.round, self.current_step, self.is_terminate))
-                self.INFO_flag = 1
-                self.round += 1
+            # if self.current_step == self.world_length-1 and self.INFO_flag == 0: # 一个episode结束都还没有成功
+            #     self.data_ = self.data_ + (self.round, int(self.is_terminate), self.current_step,)
+            #     # INFO.append(data_)  # 增加行
+            #     # print("round:{} current_step:{} is_terminate:{}".format(self.round, self.current_step, self.is_terminate))
+            #     self.INFO_flag = 1
+            #     self.round += 1
+            # elif self.is_terminate == True and self.INFO_flag == 0: # 一个episode中途成功了
+            #     self.data_ = self.data_ + (self.round, int(self.is_terminate), self.current_step,)
+            #     if self.args.gp_type == 'encirclement':
+            #         self.data_ = self.data_ + (self.angle_error/self.n, self.dist_error/self.n, )
+            #     # INFO.append(data_)  # 增加行
+            #     # print("round:{} current_step:{} is_terminate:{}".format(self.round, self.current_step, self.is_terminate))
+            #     self.INFO_flag = 1
+            #     self.round += 1
 
             if self.current_step == 0:
-                # reset parameters
+                # reset parameters (some variables also reset in the reset() function)
                 self.data_ = ()
-                self.is_terminate = False
-                self.INFO_flag = 0
-                self.collision_num = 0
-                self.reward_all = 0
-                self.cost_all = 0
+                # self.is_terminate = False
+                # self.INFO_flag = 0
+                # self.collision_num = 0
+                # self.reward_all = np.array([0]*self.n)
+                # self.cost_all = np.array([0]*self.n)
                 if self.args.gp_type == 'formation':
                     self.formation_error = 0
                 elif self.args.gp_type == 'encirclement':
                     self.dist_error = 0
                     self.angle_error = 0
             elif self.current_step == self.world_length-1:
-                self.data_ = self.data_ + (self.reward_all/self.world_length, self.collision_num, )
-                if self.args.gp_type == 'formation':
-                    self.data_ = self.data_ + (self.formation_error/self.world_length/self.n, )
-                print("round:{}".format(self.data_[0]))
-                INFO.append(self.data_)  # 增加行
+                # 记录rew和num_collision
+                for i, agent in enumerate(self.agents):
+                    suc_ = 1 if agent.finish_step < self.world_length else 0
+                    self.data_ = self.data_ + (self.round, agent.id, suc_, agent.finish_step, agent.min_dist,  agent.reward_num, agent.collision_num, )
+                    INFO.append(self.data_)  # 增加行
+                    self.data_ = ()
+
+                print("round:{}".format(self.round))
+                
+                self.round += 1
+
         else:
             if close:
                 # close any existic renderers
@@ -744,16 +749,33 @@ class MultiAgentGraphEnv(MultiAgentBaseEnv):
                     if ego == agent: pass
                     else:
                         d_ij = np.linalg.norm(agent.state.p_pos - ego.state.p_pos)
+                        d_ij_abs = d_ij - agent.R - ego.R
                         if d_ij < agent.R + ego.R:
                             self.collision_num += 1
+                            agent.collision_num += 1
+                        if d_ij_abs < agent.min_dist:
+                            agent.min_dist = d_ij_abs
                 for obs in self.world.obstacles:
                     d_ij = np.linalg.norm(agent.state.p_pos - obs.state.p_pos)
+                    d_ij_abs = d_ij - agent.R - obs.R
                     if d_ij < agent.R + obs.R:
                         self.collision_num += 1
+                        agent.collision_num += 1
+                    if d_ij_abs < agent.min_dist:
+                        agent.min_dist = d_ij_abs
                 for dobs in self.world.dynamic_obstacles:
                     d_ij = np.linalg.norm(agent.state.p_pos - dobs.state.p_pos)
+                    d_ij_abs = d_ij - agent.R - dobs.R
                     if d_ij < agent.R + dobs.R:
                         self.collision_num += 1
+                        agent.collision_num += 1
+                    if d_ij_abs < agent.min_dist:
+                        agent.min_dist = d_ij_abs
+
+                agent.reward_num += reward_n[-1][0]
+
+                if agent.done and agent.collision_num < 1 and agent.finish_step == self.world_length: # 最后一项保证只存一次
+                    agent.finish_step = self.current_step
 
                 if self.args.gp_type == 'formation':
                     self.formation_error += self.world.formation_error
@@ -792,8 +814,8 @@ class MultiAgentGraphEnv(MultiAgentBaseEnv):
         if self.shared_reward:
             reward_n = [[reward]] * self.n  # NOTE this line is similar to PPOEnv
             cost_n = [[cost]] * self.n  # NOTE this line is similar to PPOEnv
-        self.reward_all += reward  # record total reward over a trajectory
-        self.cost_all += cost  # record total cost over a trajectory
+        # self.reward_all += np.array(reward_n)  # record total reward over a trajectory
+        # self.cost_all += np.array(cost_n)  # record total cost over a trajectory
 
         # print("reward_n: ", reward_n)
         # print("node_obs_n: ", node_obs_n[0].shape)
@@ -818,6 +840,13 @@ class MultiAgentGraphEnv(MultiAgentBaseEnv):
             node_obs, adj = self._get_graph_obs(agent)
             node_obs_n.append(node_obs)
             adj_n.append(adj)
+            # follow is the initialization for monte carlo test
+            if self.monte_carlo_test:
+                agent.min_dist = 100
+                agent.reward_num = 0
+                agent.collision_num = 0
+                agent.done = False
+                agent.finish_step = self.world_length
         return obs_n, agent_id_n, node_obs_n, adj_n
 
     def _get_graph_obs(self, agent: Agent):

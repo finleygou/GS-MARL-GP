@@ -310,7 +310,6 @@ class GS_MAPPO():
         # Update Lagrangian coefficient
         if aver_episode_costs is not None:
             # delta_lamda_lagr = -(( cost_returns_batch.mean() - self.safety_bound) * (1 - self.gamma) + (imp_weights * cost_adv_targ)).mean().detach()
-            # delta_lamda_lagr = -(( aver_episode_costs.mean() - self.safety_bound) * (1 - self.gamma) + (imp_weights * cost_adv_targ)).mean().detach()
             # delta_lamda_lagr = -(( aver_episode_costs.mean() - self.safety_bound) + (imp_weights * cost_adv_targ)).mean().detach()
             delta_lamda_lagr = -((aver_episode_costs.mean() - self.safety_bound)* (1 - self.gamma)).mean().detach()
             R_ReLU = torch.nn.ReLU()

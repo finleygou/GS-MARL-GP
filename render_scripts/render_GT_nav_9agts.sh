@@ -2,7 +2,7 @@
 set -e
 # Run the script
 seed_max=1
-n_agents=3
+n_agents=9
 ep_lens=100
 use_curriculum="False"
 
@@ -16,19 +16,21 @@ do
     --algorithm_name "rmappo" \
     --seed ${seed} \
     --experiment_name "check" \
-    --scenario_name "graph_navigation_3agts" \
+    --scenario_name "graph_navigation_9agts" \
+    --max_edge_dist 1.0 \
     --hidden_size 128 \
     --layer_N 2 \
     --use_wandb "False" \
     --save_gifs "False" \
     --use_render "True" \
-    --save_data "False" \
+    --save_data "True" \
     --use_curriculum "False" \
     --use_policy "False" \
     --gp_type "navigation" \
-    --num_target 3 \
-    --num_agents 3 \
-    --num_obstacle 3 \
+    --render_file_name "9agt-GT" \
+    --num_target 9 \
+    --num_agents 9 \
+    --num_obstacle 9 \
     --num_dynamic_obs 0 \
     --n_rollout_threads 1 \
     --use_lstm "True" \
@@ -37,8 +39,8 @@ do
     --user_name "finleygou" \
     --use_cent_obs "False" \
     --graph_feat_type "relative" \
-    --use_att_gnn "True" \
-    --monte_carlo_test "False" \
-    --render_episodes 20 \
-    --model_dir "/data/goufandi_space/Projects/GS-MARL-GP/GS-MARL-GP/onpolicy/results/GraphMPE/graph_navigation_3agts/rmappo/check/wandb/run-20250830_001857-0syn3px0/files/"
+    --use_att_gnn "False" \
+    --monte_carlo_test "True" \
+    --render_episodes 100 \
+    --model_dir "/data/goufandi_space/Projects/GS-MARL-GP/GS-MARL-GP/onpolicy/results/GraphMPE/graph_navigation_9agts/rmappo/check/wandb/run-20250904_151352-btm8xdyl/files/"
 done

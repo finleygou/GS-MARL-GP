@@ -24,10 +24,11 @@ do
     --use_wandb "False" \
     --save_gifs "False" \
     --use_render "True" \
-    --save_data "False" \
+    --save_data "True" \
     --use_curriculum "False" \
     --use_policy "False" \
     --gp_type "navigation" \
+    --render_file_name "6agt-GLag" \
     --num_target 6 \
     --num_agents 6 \
     --num_obstacle 6 \
@@ -40,7 +41,7 @@ do
     --use_cent_obs "False" \
     --graph_feat_type "relative" \
     --use_att_gnn "False" \
-    --monte_carlo_test "False" \
-    --render_episodes 20 \
+    --monte_carlo_test "True" \
+    --render_episodes 100 \
     --model_dir "/data/goufandi_space/Projects/GS-MARL-GP/GS-MARL-GP/onpolicy/results/GSMPE/graph_navigation_6agts/rmappo/check/wandb/run-20250903_145628-3kcrkplp/files/"
 done

@@ -277,6 +277,7 @@ def get_config():
     parser.add_argument("--save_interval", type=int, default=1, help="time duration between continuous twice models saving.")
     parser.add_argument("--reward_file_name", type=str, default=None, help="csv name of training reward.")
     parser.add_argument("--cost_file_name", type=str, default=None, help="csv name of training cost.")
+    parser.add_argument("--render_file_name", type=str, default=None, help="data saving for monte carlo or rendering traj.")
 
     # log parameters
     parser.add_argument("--log_interval", type=int, default=5, help="time duration between continuous twice log printing.")
