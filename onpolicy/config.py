@@ -311,8 +311,8 @@ def get_config():
     parser.add_argument('--scenario_name', type=str,
                         default='simple_formation_4agts', help="Which scenario to run on")
     parser.add_argument("--gp_type", type=str,
-                        default='formation', choices=["formation", "encirclement", "navigation",
-                                                       "formation_rvo", "encirclement_rvo", "navigation_rvo"], 
+                        default='navigation_cbf', choices=["formation", "encirclement", "navigation",
+                                                       "formation_rvo", "encirclement_rvo", "navigation_rvo", "navigation_cbf"], 
                                                        help="the choose of guide policy")
 
     return parser

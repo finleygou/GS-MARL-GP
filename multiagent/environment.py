@@ -716,7 +716,7 @@ class MultiAgentGraphEnv(MultiAgentBaseEnv):
         # print("step: ", self.current_step)
 
         # set action for each agent
-        if self.use_CL:
+        if self.use_CL or self.use_policy:
             policy_u = self.policy_u(self.world, self.gp_type)
         else:
             policy_u = np.zeros((self.num_agents, 2, 1))

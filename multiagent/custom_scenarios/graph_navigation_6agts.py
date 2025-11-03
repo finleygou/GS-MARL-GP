@@ -112,7 +112,7 @@ class Scenario(BaseScenario):
         world.num_agent_collisions = np.zeros(self.num_egos)
 
         # Randomly select one of 5 scenarios
-        sid = np.random.randint(0, 5)
+        sid = np.random.randint(0, 10)
         # sid = 0
         if self.num_egos == 6:
             from multiagent.random_scenarios.nav_6agt_scenarios import Scenarios
