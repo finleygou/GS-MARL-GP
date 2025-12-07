@@ -2,7 +2,7 @@
 set -e
 # Run the script
 seed_max=1
-n_agents=9
+n_agents=6
 ep_lens=100
 use_curriculum="False"
 
@@ -17,9 +17,10 @@ do
     --algorithm_name "rmappo" \
     --seed ${seed} \
     --experiment_name "check" \
-    --scenario_name "graph_navigation_9agts" \
+    --scenario_name "graph_navigation_6agts" \
     --hidden_size 128 \
     --layer_N 2 \
+    --max_edge_dist 1.0 \
     --use_wandb "False" \
     --save_gifs "False" \
     --use_render "True" \
@@ -27,10 +28,10 @@ do
     --use_curriculum "False" \
     --use_policy "False" \
     --gp_type "navigation" \
-    --render_file_name "9agt-GLag-traj-sid2" \
-    --num_target 9 \
-    --num_agents 9 \
-    --num_obstacle 9 \
+    --render_file_name "6agt-GLag-traj" \
+    --num_target 6 \
+    --num_agents 6 \
+    --num_obstacle 6 \
     --num_dynamic_obs 0 \
     --n_rollout_threads 1 \
     --use_lstm "True" \
@@ -41,6 +42,6 @@ do
     --graph_feat_type "relative" \
     --use_att_gnn "False" \
     --monte_carlo_test "False" \
-    --render_episodes 30 \
-    --model_dir "/data/goufandi_space/Projects/GS-MARL-GP/GS-MARL-GP/onpolicy/results/GSMPE/graph_navigation_9agts/rmappo/check/wandb/run-20250903_150056-gn58608v/files/"
+    --render_episodes 5 \
+    --model_dir "/data/goufandi_space/Projects/GS-MARL-GP/GS-MARL-GP/onpolicy/results/GSMPE/graph_navigation_6agts/rmappo/check/wandb/run-20250903_145628-3kcrkplp/files/"
 done
