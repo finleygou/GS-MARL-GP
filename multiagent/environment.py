@@ -61,7 +61,7 @@ class MultiAgentBaseEnv(gym.Env):
         self.monte_carlo_test = args.monte_carlo_test
         self.round = 1
         self.last_step = 0
-        self.collision_th = 2
+        self.collision_th = 1 # 2
         self.data_ = ()
         self.INFO_flag = 0
         self.collision_num = 0

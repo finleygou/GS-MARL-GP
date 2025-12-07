@@ -15,6 +15,8 @@ from multiagent.core import World, Agent, Entity, Target, Obstacle, DynamicObsta
 from multiagent.scenario import BaseScenario
 
 entity_mapping = {"agent": 0, "target": 1, "obstacle": 2, "dynamic_obstacle": 3}
+global SID
+SID = [0,0,2,2,3,3,4,4,5,5,8,8,9,9,9]
 
 class Scenario(BaseScenario):
 
@@ -162,7 +164,12 @@ class Scenario(BaseScenario):
         '''
         
         # Randomly select one of 10 scenarios
-        sid = np.random.randint(0, 10)
+        global SID
+        # sid = np.random.randint(0, 10)
+        sid = SID.pop(0)
+        print(f"Selected Scenario ID: {sid}")
+        
+
         if self.num_egos == 3:
             from multiagent.random_scenarios.nav_3agt_scenarios import Scenarios
         else: 
@@ -178,7 +185,7 @@ class Scenario(BaseScenario):
         for i, (x, y) in enumerate(scenario['egos']):
             world.egos[i].done = False
             init_pos_ego = np.array([x, y])
-            world.egos[i].state.p_pos = init_pos_ego+np.random.randn(*init_pos_ego.shape)*0.01
+            world.egos[i].state.p_pos = init_pos_ego+np.random.randn(*init_pos_ego.shape)*0.0
             world.egos[i].state.p_vel = np.zeros(world.dim_p)
             # Goal is target position (assuming targets correspond to egos by index)
             tx, ty = scenario['targets'][i]
